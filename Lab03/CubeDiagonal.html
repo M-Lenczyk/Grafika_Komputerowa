@@ -126,6 +126,7 @@ function startGL()
   ];
   Tick();
 }
+/*
 function mulMatrix(mA,mB)
 { 
   var size=4
@@ -141,6 +142,29 @@ function mulMatrix(mA,mB)
   }
   return result;
 }
+*/
+function mulMatrix(a,b) //Mnożenie macierzy
+{
+  c = [
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0
+  ]
+  for(let i=0;i<4;i++)
+  {
+    for(let j=0;j<4;j++)
+    {
+      c[i*4+j] = 0.0;
+      for(let k=0;k<4;k++)
+      {
+        c[i*4+j]+= a[i*4+k] * b[k*4+j];
+      }
+    }
+  }
+  return c;
+}
+
 let angleOX = 35.0;
 let angleOZ = 15.0;  
 let angle = 0.0; //Macierz transformacji świata - określenie położenia kamery 
@@ -165,22 +189,24 @@ function Tick()
   ];
 
   let RotationMatrix_OX = [ //do rotacji OX
-  +Math.cos(angleOX*Math.PI/180.0),+Math.sin(angleOX*Math.PI/180.0),0,0, //Macierz Rotacji
-  -Math.sin(angleOX*Math.PI/180.0),+Math.cos(angleOX*Math.PI/180.0),0,0,
-  0,0,1,0,
+  1,0,0,0,
+  0,+Math.cos(angleOX*Math.PI/180.0),+Math.sin(angleOX*Math.PI/180.0),0,
+  0,-Math.sin(angleOX*Math.PI/180.0),+Math.cos(angleOX*Math.PI/180.0),0,
   0,0,0,1
   ];
 
   let RotationMatrix_OZ = [ //do rotacji OZ
-  1,0,0,0,
-  0,+Math.cos(angleOZ*Math.PI/180.0),-Math.sin(angleOZ*Math.PI/180.0),0, //Macierz Rotacji
-  0,-Math.sin(angleOZ*Math.PI/180.0),Math.cos(angleOZ*Math.PI/180.0),0,
+  +Math.cos(angleOZ*Math.PI/180.0),+Math.sin(angleOZ*Math.PI/180.0),0,0,
+  -Math.sin(angleOZ*Math.PI/180.0),+Math.cos(angleOZ*Math.PI/180.0),0,0,
+  0,0,1,0,
   0,0,0,1
   ];
 
-  //uMVMatrix =mulMatrix(uMVMatrix,RotationMatrix_OZ);
-  //uMVMatrix =mulMatrix(uMVMatrix,RotationMatrix_OX);
+  
+  uMVMatrix =mulMatrix(uMVMatrix,RotationMatrix_OZ);
+  uMVMatrix =mulMatrix(uMVMatrix,RotationMatrix_OX);
   uMVMatrix = mulMatrix(uMVMatrix,translationMatrix);
+ 
 
 /*
   let uMVMatrix = [
