@@ -132,16 +132,16 @@ function startGL()
   let vertexPosition = []; //3 punkty po 3 składowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójkąt
   let stepElevation = 360/120;
   let stepAngle = 360/120;
-  let outerRadius = 5;
+  let radius_2 = 7;
   let radius = 2;
   for(let elevation=0; elevation< 360; elevation+= stepElevation)
   {
     for(let angle = 0; angle < 360; angle+= stepAngle)
     {
-      let radiusXZ = outerRadius+radius*Math.cos(elevation*Math.PI/180);
+      let radiusXZ = radius_2+radius*Math.cos(elevation*Math.PI/180);
       let radiusY  = radius*Math.sin(elevation*Math.PI/180);
       
-      let radiusXZ2 = outerRadius+radius*Math.cos((elevation+stepElevation)*Math.PI/180);
+      let radiusXZ2 = radius_2+radius*Math.cos((elevation+stepElevation)*Math.PI/180);
       let radiusY2  = radius*Math.sin((elevation+stepElevation)*Math.PI/180);
       
       let px1 = radiusXZ*Math.cos(angle*Math.PI/180);
