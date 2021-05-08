@@ -1,0 +1,905 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<script type="text/javascript">
+var gl;
+var shaderProgram;
+var uPMatrix;
+var vertexPositionBuffer;
+var vertexColorBuffer;
+var vertexCoordsBuffer;
+var vertexNormalBuffer;
+
+function MatrixMul(a,b) //Mnożenie macierzy
+{
+  let c = [
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0
+  ]
+  for(let i=0;i<4;i++)
+  {
+    for(let j=0;j<4;j++)
+    {
+      c[i*4+j] = 0.0;
+      for(let k=0;k<4;k++)
+      {
+        c[i*4+j]+= a[i*4+k] * b[k*4+j];
+      }
+    }
+  }
+  return c;
+}
+
+function MatrixTransposeInverse(m)
+{
+  let r = [
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0
+    ];
+  r[0] = m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[6]*m[9]*m[15] + m[6]*m[13]*m[11] + m[7]*m[9]*m[14] - m[7]*m[13]*m[10];
+  r[1] = -m[1]*m[10]*m[15] + m[1]*m[14]*m[11] + m[2]*m[9]*m[15] - m[2]*m[13]*m[11] - m[3]*m[9]*m[14] + m[3]*m[13]*m[10];
+  r[2] = m[1]*m[6]*m[15] - m[1]*m[14]*m[7] - m[2]*m[5]*m[15] + m[2]*m[13]*m[7] + m[3]*m[5]*m[14] - m[3]*m[13]*m[6];
+  r[3] = -m[1]*m[6]*m[11] + m[1]*m[10]*m[7] + m[2]*m[5]*m[11] - m[2]*m[9]*m[7] - m[3]*m[5]*m[10] + m[3]*m[9]*m[6];
+
+  r[4] = -m[4]*m[10]*m[15] + m[4]*m[14]*m[11] + m[6]*m[8]*m[15] - m[6]*m[12]*m[11] - m[7]*m[8]*m[14] + m[7]*m[12]*m[10];
+  r[5] = m[0]*m[10]*m[15] - m[0]*m[14]*m[11] - m[2]*m[8]*m[15] + m[2]*m[12]*m[11] + m[3]*m[8]*m[14] - m[3]*m[12]*m[10];
+  r[6] = -m[0]*m[6]*m[15] + m[0]*m[14]*m[7] + m[2]*m[4]*m[15] - m[2]*m[12]*m[7] - m[3]*m[4]*m[14] + m[3]*m[12]*m[6];
+  r[7] = m[0]*m[6]*m[11] - m[0]*m[10]*m[7] - m[2]*m[4]*m[11] + m[2]*m[8]*m[7] + m[3]*m[4]*m[10] - m[3]*m[8]*m[6];
+
+  r[8] = m[4]*m[9]*m[15] - m[4]*m[13]*m[11] - m[5]*m[8]*m[15] + m[5]*m[12]*m[11] + m[7]*m[8]*m[13] - m[7]*m[12]*m[9];
+  r[9] = -m[0]*m[9]*m[15] + m[0]*m[13]*m[11] + m[1]*m[8]*m[15] - m[1]*m[12]*m[11] - m[3]*m[8]*m[13] + m[3]*m[12]*m[9];
+  r[10] = m[0]*m[5]*m[15] - m[0]*m[13]*m[7] - m[1]*m[4]*m[15] + m[1]*m[12]*m[7] + m[3]*m[4]*m[13] - m[3]*m[12]*m[5];
+  r[11] = -m[0]*m[5]*m[11] + m[0]*m[9]*m[7] + m[1]*m[4]*m[11] - m[1]*m[8]*m[7] - m[3]*m[4]*m[9] + m[3]*m[8]*m[5];
+
+  r[12] = -m[4]*m[9]*m[14] + m[4]*m[13]*m[10] + m[5]*m[8]*m[14] - m[5]*m[12]*m[10] - m[6]*m[8]*m[13] + m[6]*m[12]*m[9];
+  r[13] = m[0]*m[9]*m[14] - m[0]*m[13]*m[10] - m[1]*m[8]*m[14] + m[1]*m[12]*m[10] + m[2]*m[8]*m[13] - m[2]*m[12]*m[9];
+  r[14] = -m[0]*m[5]*m[14] + m[0]*m[13]*m[6] + m[1]*m[4]*m[14] - m[1]*m[12]*m[6] - m[2]*m[4]*m[13] + m[2]*m[12]*m[5];
+  r[15] = m[0]*m[5]*m[10] - m[0]*m[9]*m[6] - m[1]*m[4]*m[10] + m[1]*m[8]*m[6] + m[2]*m[4]*m[9] - m[2]*m[8]*m[5];
+
+  var det = m[0]*r[0] + m[1]*r[4] + m[2]*r[8] + m[3]*r[12];
+  for (var i = 0; i < 16; i++) r[i] /= det;
+  
+  let rt = [ r[0], r[4], r[8], r[12],
+             r[1], r[5], r[9], r[13],
+             r[2], r[6], r[10], r[14],
+             r[3], r[7], r[11], r[15]
+             ];
+  
+  return rt;
+}
+
+function CreateIdentytyMatrix()
+{
+  return [
+  1,0,0,0, //Macierz jednostkowa
+  0,1,0,0,
+  0,0,1,0,
+  0,0,0,1
+  ];
+}
+
+function CreateTranslationMatrix(tx,ty,tz)
+{
+  return  [
+  1,0,0,0,
+  0,1,0,0,
+  0,0,1,0,
+  tx,ty,tz,1
+  ];
+}
+
+function CreateScaleMatrix(sx,sy,sz)
+{
+  return [
+  sx,0,0,0,
+  0,sy,0,0,
+  0,0,sz,0,
+  0,0,0,1
+  ];
+}
+
+function CreateRotationZMatrix(angleZ)
+{
+  return [
+  +Math.cos(angleZ*Math.PI/180.0),+Math.sin(angleZ*Math.PI/180.0),0,0,
+  -Math.sin(angleZ*Math.PI/180.0),+Math.cos(angleZ*Math.PI/180.0),0,0,
+  0,0,1,0,
+  0,0,0,1
+  ];
+}
+
+function CreateRotationYMatrix(angleY)
+{
+  return [
+  +Math.cos(angleY*Math.PI/180.0),0,-Math.sin(angleY*Math.PI/180.0),0,
+  0,1,0,0,
+  +Math.sin(angleY*Math.PI/180.0),0,+Math.cos(angleY*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+}
+
+function CreateRotationXMatrix(angleX)
+{
+  return [
+  1,0,0,0,
+  0,+Math.cos(angleX*Math.PI/180.0),+Math.sin(angleX*Math.PI/180.0),0,
+  0,-Math.sin(angleX*Math.PI/180.0),+Math.cos(angleX*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+}
+
+function createRect(mx,my,mz,dax,day,daz,dbx,dby,dbz)
+{
+  p1x = mx;             p1y = my;             p1z = mz;
+  p2x = mx + dax;       p2y = my + day;       p2z = mz + daz;
+  p3x = mx + dbx;       p3y = my + dby;       p3z = mz + dbz;
+  p4x = mx + dax + dbx; p4y = my + day + dby; p4z = mz + daz + dbz;
+  
+  let vertexPosition = [p1x,p1y,p1z, p2x,p2y,p2z, p4x,p4y,p4z,  //Pierwszy trójkąt
+                        p1x,p1y,p1z, p4x,p4y,p4z, p3x,p3y,p3z]; //Drugi trójkąt
+                        
+  return vertexPosition;
+}
+
+function createNormal(p1x,p1y,p1z,p2x,p2y,p2z,p3x,p3y,p3z) //Wyznaczenie wektora normalnego dla trójkąta
+{
+  let v1x = p2x - p1x;
+  let v1y = p2y - p1y;
+  let v1z = p2z - p1z;
+  
+  let v2x = p3x - p1x;
+  let v2y = p3y - p1y;
+  let v2z = p3z - p1z;
+  
+  let v3x =  v1y*v2z - v1z*v2y;
+  let v3y =  v1z*v2x - v1x*v2z;
+  let v3z =  v1x*v2y - v1y*v2x;
+  
+  vl = Math.sqrt(v3x*v3x+v3y*v3y+v3z*v3z); //Obliczenie długości wektora
+   
+  v3x/=vl; //Normalizacja na zakreś -1 1
+  v3y/=vl;
+  v3z/=vl;
+  
+  let vertexNormal = [v3x,v3y,v3z, v3x,v3y,v3z, v3x,v3y,v3z];
+  return vertexNormal;
+}
+
+function CreateBox(x,y,z,dx,dy,dz)
+{
+  //Opis sceny 3D, położenie punktów w przestrzeni 3D w formacie X,Y,Z 
+  let vertexPosition = []; //3 punkty po 3 składowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójkąt
+  let vertexNormal = [];
+  
+  vertexPosition.push(...createRect(-1,-1,-1,0,2,0,2,0,0));
+  vertexPosition.push(...createRect(-1,-1,-1,0,0,2,0,2,0));
+  vertexPosition.push(...createRect(-1,-1,-1,2,0,0,0,0,2));
+  
+  vertexPosition.push(...createRect(1,1,1,-2,0,0,0,-2,0));
+  vertexPosition.push(...createRect(1,1,1,0,-2,0,0,0,-2));
+  vertexPosition.push(...createRect(1,1,1,0,0,-2,-2,0,0));
+  //
+  for(let i=0;i<vertexPosition.length;i=i+9)
+  {
+    vertexNormal.push(...createNormal(vertexPosition[i+0],vertexPosition[i+1],vertexPosition[i+2],vertexPosition[i+3],vertexPosition[i+4],vertexPosition[i+5],vertexPosition[i+6],vertexPosition[i+7],vertexPosition[i+8]));
+  }
+  
+  return [vertexPosition, vertexNormal];
+}
+
+function startGL() 
+{
+  alert("StartGL");
+  let canvas = document.getElementById("canvas3D"); //wyszukanie obiektu w strukturze strony 
+  gl = canvas.getContext("experimental-webgl"); //pobranie kontekstu OpenGL'u z obiektu canvas
+  gl.viewportWidth = canvas.width; //przypisanie wybranej przez nas rozdzielczości do systemu OpenGL
+  gl.viewportHeight = canvas.height;
+  
+    //Kod shaderów
+  const vertextShaderSource = ` //Znak akcentu z przycisku tyldy - na lewo od przycisku 1 na klawiaturze
+    precision highp float;
+    attribute vec3 aVertexPosition; 
+    attribute vec3 aVertexNormal;
+    uniform mat4 uMMatrix;
+    uniform mat4 uInvMMatrix;
+    uniform mat4 uVMatrix;
+    uniform mat4 uPMatrix;
+    varying vec3 vPos;
+    varying vec3 vNormal;
+    uniform float uNormalMul;
+    void main(void) {
+      vPos = vec3(uMMatrix * vec4(aVertexPosition, 1.0));
+      gl_Position = uPMatrix * uVMatrix * vec4(vPos,1.0); //Dokonanie transformacji położenia punktów z przestrzeni 3D do przestrzeni obrazu (2D)
+      vNormal = normalize(mat3(uInvMMatrix) * uNormalMul*aVertexNormal); //Obrot wektorow normalnych
+    }
+  `;
+  const fragmentShaderSource = `
+    precision highp float;
+    varying vec3 vPos;
+    varying vec3 vNormal;
+    uniform sampler2D uSampler;
+    uniform vec3 uLightPosition;
+    uniform vec3 uColor;
+    void main(void) {
+       vec3 lightDirection = normalize(uLightPosition - vPos);
+       float brightness = max(dot(vNormal,lightDirection), 0.0);
+      //gl_FragColor = vec4(vColor,1.0); //Ustalenie stałego koloru wszystkich punktów sceny
+      //gl_FragColor = texture2D(uSampler,vTexUV)*vec4(vColor,1.0); //Odczytanie punktu tekstury i przypisanie go jako koloru danego punktu renderowaniej figury
+      //gl_FragColor = vec4((vNormal+vec3(1.0,1.0,1.0))/2.0,1.0); 
+      //gl_FragColor = clamp(texture2D(uSampler,vTexUV) * vec4(brightness,brightness,brightness,1.0),0.0,1.0);
+      gl_FragColor = clamp(vec4(uColor,1.0) * vec4(brightness,brightness,brightness,1.0),0.0,1.0);
+    }
+  `;
+  let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER); //Stworzenie obiektu shadera 
+  let vertexShader   = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(fragmentShader, fragmentShaderSource); //Podpięcie źródła kodu shader
+  gl.shaderSource(vertexShader, vertextShaderSource);
+  gl.compileShader(fragmentShader); //Kompilacja kodu shader
+  gl.compileShader(vertexShader);
+  if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { //Sprawdzenie ewentualnych błedów kompilacji
+    alert(gl.getShaderInfoLog(fragmentShader));
+    return null;
+  }
+  if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+    alert(gl.getShaderInfoLog(vertexShader));
+    return null;
+  }
+  
+  shaderProgram = gl.createProgram(); //Stworzenie obiektu programu 
+  gl.attachShader(shaderProgram, vertexShader); //Podpięcie obu shaderów do naszego programu wykonywanego na karcie graficznej
+  gl.attachShader(shaderProgram, fragmentShader);
+  gl.linkProgram(shaderProgram);
+  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych błedów
+  
+  //Opis sceny 3D, położenie punktów w przestrzeni 3D w formacie X,Y,Z 
+  let vertexPosition; //3 punkty po 3 składowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójkąt
+  let vertexNormal;
+  
+  //[vertexPosition, vertexColor, vertexCoords, vertexNormal] = CreateShpere(0,0,0,2, 6, 12); 
+  [vertexPosition, vertexNormal] = CreateBox(0,0,0,1,1,1);//CreateBox(0,0,0,1,1,1);
+  
+  vertexPositionBuffer = gl.createBuffer(); //Stworzenie tablicy w pamieci karty graficznej
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPosition), gl.STATIC_DRAW);
+  vertexPositionBuffer.itemSize = 3; //zdefiniowanie liczby współrzednych per wierzchołek
+  vertexPositionBuffer.numItems = vertexPosition.length/9; //Zdefinoiowanie liczby trójkątów w naszym buforze
+  
+  vertexNormalBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexNormalBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormal), gl.STATIC_DRAW);
+  vertexNormalBuffer.itemSize = 3;
+  vertexNormalBuffer.numItems = vertexNormal.length/9;
+  
+  //Macierze opisujące położenie wirtualnej kamery w przestrzenie 3D
+  let aspect = gl.viewportWidth/gl.viewportHeight;
+  let fov = 45.0 * Math.PI / 180.0; //Określenie pola widzenia kamery
+  let zFar = 100.0; //Ustalenie zakresów renderowania sceny 3D (od obiektu najbliższego zNear do najdalszego zFar)
+  let zNear = 0.1;
+  uPMatrix = [
+   1.0/(aspect*Math.tan(fov/2)),0                           ,0                         ,0                            ,
+   0                         ,1.0/(Math.tan(fov/2))         ,0                         ,0                            ,
+   0                         ,0                           ,-(zFar+zNear)/(zFar-zNear)  , -1,
+   0                         ,0                           ,-(2*zFar*zNear)/(zFar-zNear) ,0.0,
+  ];
+  Tick();
+} 
+//let angle = 45.0; //Macierz transformacji świata - określenie położenia kamery 
+
+var angleZ = 0.0;
+var angleY = 0.0;
+var angleX = 0.0;
+var KameraPositionZ = -30.0;//START KAMERA "orbita"
+//----ROBOT BODY
+
+//Torso
+var Object1PositionX = 0.0;
+var Object1PositionY = 3.0;
+var Object1PositionZ = 0.0;
+var Object1Sizedx = 3.0;
+var Object1Sizedy = 3.0;
+var Object1Sizedz = 3.0;
+//Head
+var Object2PositionX = 0.0;
+var Object2PositionY = 9.0;
+var Object2PositionZ = 0.0;
+var Object2Sizedx = 2.0;
+var Object2Sizedy = 2.0;
+var Object2Sizedz = 2.0;
+//Neck
+var Object3PositionX = 0.0;
+var Object3PositionY = 6.5;
+var Object3PositionZ = 0.0;
+var Object3Sizedx = 1.5;
+var Object3Sizedy = 0.5;
+var Object3Sizedz = 1.5;
+//LowerTorso
+var Object4PositionX = 0.0;
+var Object4PositionY = -1.0;
+var Object4PositionZ = 0.0;
+var Object4Sizedx = 1.3;
+var Object4Sizedy = 1.0;
+var Object4Sizedz = 2.0;
+//LeftLegJoint
+var Object5PositionX = -1.5;
+var Object5PositionY = -1.0;
+var Object5PositionZ = 0.0;
+var Object5Sizedx = 0.3;
+var Object5Sizedy = 0.5;
+var Object5Sizedz = 0.5;
+//RightLegJoint
+var Object6PositionX = 1.5;
+var Object6PositionY = -1.0;
+var Object6PositionZ = 0.0;
+var Object6Sizedx = 0.3;
+var Object6Sizedy = 0.5;
+var Object6Sizedz = 0.5;
+//LeftLeg
+var Object7PositionX = -2.5;
+var Object7PositionY = -0.5;
+var Object7PositionZ = 0.0;
+var Object7Sizedx = 0.7;
+var Object7Sizedy = 1.75;
+var Object7Sizedz = 1.0;
+
+var Object7AngleX = 0.0;
+
+//RightLeg
+var Object8PositionX = 2.5;
+var Object8PositionY = -0.5;
+var Object8PositionZ = 0.0;
+var Object8Sizedx = 0.7;
+var Object8Sizedy = 1.75;
+var Object8Sizedz = 1.0;
+
+var Object8AngleX = 0.0;
+
+//LeftArmJoint
+var Object9PositionX = 3.3;
+var Object9PositionY = 3.0;
+var Object9PositionZ = 0.0;
+var Object9Sizedx = 0.3;
+var Object9Sizedy = 0.5;
+var Object9Sizedz = 0.5;
+//RightArmJoint
+var Object10PositionX = -3.3;
+var Object10PositionY = 3.0;
+var Object10PositionZ = 0.0;
+var Object10Sizedx = 0.3;
+var Object10Sizedy = 0.5;
+var Object10Sizedz = 0.5;
+//LeftArm
+var Object11PositionX = -3.9;
+var Object11PositionY = 3.0;
+var Object11PositionZ = 0.0;
+var Object11Sizedx = 0.3;
+var Object11Sizedy = 2.5;
+var Object11Sizedz = 1.0;
+
+var Object11AngleX = 0.0;
+
+//LeftHand
+var Object12PositionX = 0;
+var Object12PositionY = -1.5;
+var Object12PositionZ =  0.0;
+var Object12Sizedx = 0.3;
+var Object12Sizedy = 0.5;
+var Object12Sizedz = 2.0;
+
+var Object12AngleX = 0.0;
+
+//RightArm
+var Object13PositionX = 3.9;
+var Object13PositionY = 3.0;
+var Object13PositionZ = 0.0;
+var Object13Sizedx = 0.3;
+var Object13Sizedy = 2.5;
+var Object13Sizedz = 1.0;
+
+var Object13AngleX = 0.0;
+
+//RightHand
+var Object14PositionX = 0.0;
+var Object14PositionY = -1.5;
+var Object14PositionZ = 0.0;
+var Object14Sizedx = 0.3;
+var Object14Sizedy = 0.5;
+var Object14Sizedz = 2.0;
+
+var Object14AngleX = 0.0;
+
+//LeftFoot
+var Object15PositionX = -0.0;
+var Object15PositionY = -1.5;
+var Object15PositionZ = 0.0;
+var Object15Sizedx = 1.2;
+var Object15Sizedy = 0.5;
+var Object15Sizedz = 2.0;
+
+var Object15AngleX = 0.0;
+
+//RightFoot
+var Object16PositionX = 0.0;
+var Object16PositionY = -1.5;
+var Object16PositionZ = 0.0;
+var Object16Sizedx = 1.2;
+var Object16Sizedy = 0.5;
+var Object16Sizedz = 2.0;
+
+var Object16AngleX = 0.0;
+
+//LeftAntenna
+var Object17PositionX = -2.3;
+var Object17PositionY = 9.5;
+var Object17PositionZ = 0.0;
+var Object17Sizedx = 0.3;
+var Object17Sizedy = 2.2;
+var Object17Sizedz = 0.7;
+//RightAntenna
+var Object18PositionX = 2.3;
+var Object18PositionY = 9.5;
+var Object18PositionZ = 0.0;
+var Object18Sizedx = 0.3;
+var Object18Sizedy = 2.2;
+var Object18Sizedz = 0.7;
+//Visor
+var Object19PositionX = 0.0;
+var Object19PositionY = 9.5;
+var Object19PositionZ = 2.2;
+var Object19Sizedx = 1.5;
+var Object19Sizedy = 0.3;
+var Object19Sizedz = 0.2;
+
+//LeftLowerLeg
+var Object20PositionX = -0.0;
+var Object20PositionY = -1.5;
+var Object20PositionZ = 0.0;
+var Object20Sizedx = 0.7;
+var Object20Sizedy = 1.75;
+var Object20Sizedz = 1.0;
+
+var Object20AngleX = 0.0;
+
+//RightLowerLeg
+var Object21PositionX = 0.0;
+var Object21PositionY = -1.5;
+var Object21PositionZ = 0.0;
+var Object21Sizedx = 0.7;
+var Object21Sizedy = 1.75;
+var Object21Sizedz = 1.0;
+
+var Object21AngleX = 0.0;
+
+//--------LIGHT
+var LightSize = 0.1;
+var LightPositionX = 10;
+var LightPositionY = 0;
+var LightPositionZ = 0;
+
+
+function Tick()
+{ 
+  let uMMatrix0 = CreateIdentytyMatrix(); 
+  let uMMatrix1 = CreateIdentytyMatrix();
+  let uMMatrix2 = CreateIdentytyMatrix();
+  let uMMatrix3 = CreateIdentytyMatrix();
+  let uMMatrix4 = CreateIdentytyMatrix();
+  let uMMatrix5 = CreateIdentytyMatrix();
+  let uMMatrix6 = CreateIdentytyMatrix();
+  let uMMatrix7 = CreateIdentytyMatrix();
+  let uMMatrix8 = CreateIdentytyMatrix();
+  let uMMatrix9 = CreateIdentytyMatrix();
+  let uMMatrix10 = CreateIdentytyMatrix();
+  let uMMatrix11 = CreateIdentytyMatrix();
+  let uMMatrix12 = CreateIdentytyMatrix();
+  let uMMatrix13 = CreateIdentytyMatrix();
+  let uMMatrix14 = CreateIdentytyMatrix();
+  let uMMatrix15 = CreateIdentytyMatrix();
+  let uMMatrix16 = CreateIdentytyMatrix();
+  let uMMatrix17 = CreateIdentytyMatrix();
+  let uMMatrix18 = CreateIdentytyMatrix();
+  let uMMatrix19 = CreateIdentytyMatrix();
+  let uMMatrix20 = CreateIdentytyMatrix();
+  let uMMatrix21 = CreateIdentytyMatrix();
+
+  let uVMatrix = CreateIdentytyMatrix();
+  
+  
+  uVMatrix = MatrixMul(uVMatrix,CreateRotationXMatrix(angleX));
+  uVMatrix = MatrixMul(uVMatrix,CreateRotationYMatrix(angleY));
+  uVMatrix = MatrixMul(uVMatrix,CreateRotationZMatrix(angleZ));
+  uVMatrix = MatrixMul(uVMatrix,CreateTranslationMatrix(0,0,KameraPositionZ));
+  
+  //Torso
+  uMMatrix1 = MatrixMul(uMMatrix1,CreateScaleMatrix(Object1Sizedx,Object1Sizedy,Object1Sizedz));
+  uMMatrix1 = MatrixMul(uMMatrix1,CreateTranslationMatrix(Object1PositionX,Object1PositionY,Object1PositionZ));  
+  //Head
+  uMMatrix2 = MatrixMul(uMMatrix2,CreateScaleMatrix(Object2Sizedx,Object2Sizedy,Object2Sizedz));
+  uMMatrix2 = MatrixMul(uMMatrix2,CreateTranslationMatrix(Object2PositionX,Object2PositionY,Object2PositionZ));
+  //Neck
+  uMMatrix3 = MatrixMul(uMMatrix3,CreateScaleMatrix(Object3Sizedx,Object3Sizedy,Object3Sizedz));
+  uMMatrix3 = MatrixMul(uMMatrix3,CreateTranslationMatrix(Object3PositionX,Object3PositionY,Object3PositionZ));
+  //LowerTorso
+  uMMatrix4 = MatrixMul(uMMatrix4,CreateScaleMatrix(Object4Sizedx,Object4Sizedy,Object4Sizedz));
+  uMMatrix4 = MatrixMul(uMMatrix4,CreateTranslationMatrix(Object4PositionX,Object4PositionY,Object4PositionZ));
+  //LeftLegJoint
+  uMMatrix5 = MatrixMul(uMMatrix5,CreateScaleMatrix(Object5Sizedx,Object5Sizedy,Object5Sizedz));
+  uMMatrix5 = MatrixMul(uMMatrix5,CreateTranslationMatrix(Object5PositionX,Object5PositionY,Object5PositionZ));
+  //RightLegJoint
+  uMMatrix6 = MatrixMul(uMMatrix6,CreateScaleMatrix(Object6Sizedx,Object6Sizedy,Object6Sizedz));
+  uMMatrix6 = MatrixMul(uMMatrix6,CreateTranslationMatrix(Object6PositionX,Object6PositionY,Object6PositionZ));
+  //LeftLeg
+  uMMatrix7 = MatrixMul(uMMatrix7,CreateScaleMatrix(Object7Sizedx,Object7Sizedy,Object7Sizedz));  
+  uMMatrix7 = MatrixMul(uMMatrix7,CreateTranslationMatrix(0,-Object7Sizedy,0));
+  uMMatrix7 = MatrixMul(uMMatrix7,CreateRotationXMatrix(Object7AngleX));
+  uMMatrix7 = MatrixMul(uMMatrix7,CreateTranslationMatrix(Object7PositionX,Object7PositionY,Object7PositionZ));
+  //RightLeg
+  uMMatrix8 = MatrixMul(uMMatrix8,CreateScaleMatrix(Object8Sizedx,Object8Sizedy,Object8Sizedz));  
+  uMMatrix8 = MatrixMul(uMMatrix8,CreateTranslationMatrix(0,-Object8Sizedy,0));
+  uMMatrix8 = MatrixMul(uMMatrix8,CreateRotationXMatrix(Object8AngleX));
+  uMMatrix8 = MatrixMul(uMMatrix8,CreateTranslationMatrix(Object8PositionX,Object8PositionY,Object8PositionZ));
+  //LeftArmJoint
+  uMMatrix9 = MatrixMul(uMMatrix9,CreateScaleMatrix(Object9Sizedx,Object9Sizedy,Object9Sizedz));
+  uMMatrix9 = MatrixMul(uMMatrix9,CreateTranslationMatrix(Object9PositionX,Object9PositionY,Object9PositionZ));
+  //RightArmJoint
+  uMMatrix10 = MatrixMul(uMMatrix10,CreateScaleMatrix(Object10Sizedx,Object10Sizedy,Object10Sizedz));
+  uMMatrix10 = MatrixMul(uMMatrix10,CreateTranslationMatrix(Object10PositionX,Object10PositionY,Object10PositionZ));
+  //LeftArm
+  uMMatrix11 = MatrixMul(uMMatrix11,CreateScaleMatrix(Object11Sizedx,Object11Sizedy,Object11Sizedz));
+  uMMatrix11 = MatrixMul(uMMatrix11,CreateTranslationMatrix(0,0,0));
+  uMMatrix11 = MatrixMul(uMMatrix11,CreateRotationXMatrix(Object11AngleX));
+  uMMatrix11 = MatrixMul(uMMatrix11,CreateTranslationMatrix(Object11PositionX,Object11PositionY,Object11PositionZ));
+  
+  //LeftHand
+  uMMatrix12 = MatrixMul(uMMatrix12,CreateScaleMatrix(Object12Sizedx,Object12Sizedy,Object12Sizedz)); 
+  uMMatrix12 = MatrixMul(uMMatrix12,CreateTranslationMatrix(0,-Object12Sizedy,Object12Sizedz));
+  uMMatrix12 = MatrixMul(uMMatrix12,CreateRotationXMatrix(Object12AngleX));
+  uMMatrix12 = MatrixMul(uMMatrix12,CreateTranslationMatrix(Object12PositionX,Object12PositionY,Object12PositionZ));
+  
+  uMMatrix12 = MatrixMul(uMMatrix12,CreateTranslationMatrix(0,0,0));
+  uMMatrix12 = MatrixMul(uMMatrix12,CreateRotationXMatrix(Object11AngleX));
+  uMMatrix12 = MatrixMul(uMMatrix12,CreateTranslationMatrix(Object11PositionX,Object11PositionY,Object11PositionZ));
+  //RightArm
+  uMMatrix13 = MatrixMul(uMMatrix13,CreateScaleMatrix(Object13Sizedx,Object13Sizedy,Object13Sizedz)); 
+  uMMatrix13 = MatrixMul(uMMatrix13,CreateTranslationMatrix(0,0,0));
+  uMMatrix13 = MatrixMul(uMMatrix13,CreateRotationXMatrix(Object13AngleX));
+  uMMatrix13 = MatrixMul(uMMatrix13,CreateTranslationMatrix(Object13PositionX,Object13PositionY,Object13PositionZ));
+  //RightHand
+  uMMatrix14 = MatrixMul(uMMatrix14,CreateScaleMatrix(Object14Sizedx,Object14Sizedy,Object14Sizedz));
+  uMMatrix14 = MatrixMul(uMMatrix14,CreateTranslationMatrix(0,-Object14Sizedy,Object14Sizedz));
+  uMMatrix14 = MatrixMul(uMMatrix14,CreateRotationXMatrix(Object14AngleX));
+  uMMatrix14 = MatrixMul(uMMatrix14,CreateTranslationMatrix(Object14PositionX,Object14PositionY,Object14PositionZ));
+  
+  uMMatrix14 = MatrixMul(uMMatrix14,CreateTranslationMatrix(0,0,0));
+  uMMatrix14 = MatrixMul(uMMatrix14,CreateRotationXMatrix(Object13AngleX));
+  uMMatrix14 = MatrixMul(uMMatrix14,CreateTranslationMatrix(Object13PositionX,Object13PositionY,Object13PositionZ));
+  //LeftFoot
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateScaleMatrix(Object15Sizedx,Object15Sizedy,Object15Sizedz));
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateTranslationMatrix(0,-Object15Sizedy,0));
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateRotationXMatrix(Object15AngleX));
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateTranslationMatrix(Object15PositionX,Object15PositionY,Object15PositionZ));
+  
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateTranslationMatrix(0,-Object20Sizedy,0));
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateRotationXMatrix(Object20AngleX));
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateTranslationMatrix(Object20PositionX,Object20PositionY,Object20PositionZ));
+
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateTranslationMatrix(0,-Object7Sizedy,0));
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateRotationXMatrix(Object7AngleX));
+  uMMatrix15 = MatrixMul(uMMatrix15,CreateTranslationMatrix(Object7PositionX,Object7PositionY,Object7PositionZ));
+
+  //RightFoot
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateScaleMatrix(Object16Sizedx,Object16Sizedy,Object16Sizedz));
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateTranslationMatrix(0,-Object16Sizedy,0));
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateRotationXMatrix(Object16AngleX));
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateTranslationMatrix(Object16PositionX,Object16PositionY,Object16PositionZ));
+  
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateTranslationMatrix(0,-Object21Sizedy,0));
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateRotationXMatrix(Object21AngleX));
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateTranslationMatrix(Object21PositionX,Object21PositionY,Object21PositionZ));
+
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateTranslationMatrix(0,-Object8Sizedy,0));
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateRotationXMatrix(Object8AngleX));
+  uMMatrix16 = MatrixMul(uMMatrix16,CreateTranslationMatrix(Object8PositionX,Object8PositionY,Object8PositionZ));
+  //LeftAntenna
+  uMMatrix17 = MatrixMul(uMMatrix17,CreateScaleMatrix(Object17Sizedx,Object17Sizedy,Object17Sizedz));
+  uMMatrix17 = MatrixMul(uMMatrix17,CreateTranslationMatrix(Object17PositionX,Object17PositionY,Object17PositionZ));
+  //RightAntenna
+  uMMatrix18 = MatrixMul(uMMatrix18,CreateScaleMatrix(Object18Sizedx,Object18Sizedy,Object18Sizedz));
+  uMMatrix18 = MatrixMul(uMMatrix18,CreateTranslationMatrix(Object18PositionX,Object18PositionY,Object18PositionZ));
+  //Visor
+  uMMatrix19 = MatrixMul(uMMatrix19,CreateScaleMatrix(Object19Sizedx,Object19Sizedy,Object19Sizedz));
+  uMMatrix19 = MatrixMul(uMMatrix19,CreateTranslationMatrix(Object19PositionX,Object19PositionY,Object19PositionZ));
+  //LeftLowerLeg
+  uMMatrix20 = MatrixMul(uMMatrix20,CreateScaleMatrix(Object20Sizedx,Object20Sizedy,Object20Sizedz)); 
+  uMMatrix20 = MatrixMul(uMMatrix20,CreateTranslationMatrix(0,-Object20Sizedy,0));
+  uMMatrix20 = MatrixMul(uMMatrix20,CreateRotationXMatrix(Object20AngleX));
+  uMMatrix20 = MatrixMul(uMMatrix20,CreateTranslationMatrix(Object20PositionX,Object20PositionY,Object20PositionZ));
+  
+  uMMatrix20 = MatrixMul(uMMatrix20,CreateTranslationMatrix(0,-Object7Sizedy,0));
+  uMMatrix20 = MatrixMul(uMMatrix20,CreateRotationXMatrix(Object7AngleX));
+  uMMatrix20 = MatrixMul(uMMatrix20,CreateTranslationMatrix(Object7PositionX,Object7PositionY,Object7PositionZ));
+  //RightLowerLeg
+  uMMatrix21 = MatrixMul(uMMatrix21,CreateScaleMatrix(Object21Sizedx,Object21Sizedy,Object21Sizedz)); 
+  uMMatrix21 = MatrixMul(uMMatrix21,CreateTranslationMatrix(0,-Object21Sizedy,0));
+  uMMatrix21 = MatrixMul(uMMatrix21,CreateRotationXMatrix(Object21AngleX));
+  uMMatrix21 = MatrixMul(uMMatrix21,CreateTranslationMatrix(Object21PositionX,Object21PositionY,Object21PositionZ));
+
+  uMMatrix21 = MatrixMul(uMMatrix21,CreateTranslationMatrix(0,-Object8Sizedy,0));
+  uMMatrix21 = MatrixMul(uMMatrix21,CreateRotationXMatrix(Object8AngleX));
+  uMMatrix21 = MatrixMul(uMMatrix21,CreateTranslationMatrix(Object8PositionX,Object8PositionY,Object8PositionZ));
+  //OŚWIETLENIE
+  uMMatrix0 = MatrixMul(uMMatrix0,CreateScaleMatrix(LightSize,LightSize,LightSize));
+  uMMatrix0 = MatrixMul(uMMatrix0,CreateTranslationMatrix(LightPositionX,LightPositionY,LightPositionZ));
+  
+  //alert(uPMatrix);
+  
+  //Render Scene
+  gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight); 
+  gl.clearColor(1.0,0.0,0.0,1.0); //Wyczyszczenie obrazu kolorem czerwonym
+  gl.clearDepth(1.0);             //Wyczyścienie bufora głebi najdalszym planem
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(shaderProgram)   //Użycie przygotowanego programu shaderowego
+  
+  gl.enable(gl.DEPTH_TEST);           // Włączenie testu głębi - obiekty bliższe mają przykrywać obiekty dalsze
+  gl.depthFunc(gl.LEQUAL);            // 
+  
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uPMatrix"), false, new Float32Array(uPMatrix)); //Wgranie macierzy kamery do pamięci karty graficznej
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uVMatrix"), false, new Float32Array(uVMatrix));
+  gl.uniform1f(gl.getUniformLocation(shaderProgram, "uNormalMul"),1.0);
+  
+  
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix1));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix1)));
+  
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie położenia
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexPosition"), vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexNormal"));  //Przekazywanie wektorów normalnych
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexNormalBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexNormal"), vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uLightPosition"),LightPositionX,LightPositionY,LightPositionZ);
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.7,0.7,0.7); 
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+  
+  //Drugi Obiekt //Head
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix2));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix2)));
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Trzeci Obiekt //Neck
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix3));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix3)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.3,0.3,0.3);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+  
+  //Czwarty Obiekt //LowerTorso
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix4));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix4)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.7,0.7,0.7); 
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Piąty Obiekt //LeftLegJoint
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix5));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix5)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.3,0.3,0.3);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+  
+  //Szósty Obiekt //RightLegJoint
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix6));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix6)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.3,0.3,0.3);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+  
+  //Siódmy Obiekt //LeftLeg
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix7));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix7)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.7,0.7,0.7); 
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+  
+  //Ósmy Obiekt //RightLeg
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix8));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix8)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.7,0.7,0.7); 
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Dziewiąty Obiekt //LeftArmJoint
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix9));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix9)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.3,0.3,0.3);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Dziesiąty Obiekt //RightArmJoint
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix10));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix10)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.3,0.3,0.3);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Jedenasty Obiekt //LeftArm
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix11));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix11)));
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Dwunasty Obiekt //LeftHand
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix12));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix12)));
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Trzynasty Obiekt //RightArm
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix13));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix13)));
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Czternasty Obiekt //RightHand
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix14));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix14)));
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+ 
+  //Piętnasty Obiekt //LeftFoot
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix15));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix15)));
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Szesnasty Obiekt //RightFoot
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix16));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix16)));
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Siedemnasty Obiekt //LeftAntenna
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix17));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix17)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.3,0.3,0.3);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Osiemnasty Obiekt //RightAntenna
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix18));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix18)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.3,0.3,0.3);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Dziewiętnasty Obiekt //Visor
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix19));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix19)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),1.0,0.0,0.0);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Dwudziesty Obiekt //LeftLowerLeg
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix20));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix20)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.7,0.7,0.7);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Dwudziesty-1 Obiekt //RightLowerLeg
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix21));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix21)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.7,0.7,0.7);
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+
+  //Obiekt Światła
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix0));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix0)));
+  gl.uniform1f(gl.getUniformLocation(shaderProgram, "uNormalMul"),-1.0);
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),1.0,1.0,0.0);  
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+  
+  setTimeout(Tick,1);
+}
+function handlekeydown(e)
+{
+ // Q W E A S D
+ if(e.keyCode==87) angleX=angleX+1.0; //W
+ if(e.keyCode==83) angleX=angleX-1.0; //S
+ if(e.keyCode==68) angleY=angleY+1.0;
+ if(e.keyCode==65) angleY=angleY-1.0;
+ if(e.keyCode==81) angleZ=angleZ+1.0;
+ if(e.keyCode==69) angleZ=angleZ-1.0;
+ //alert(e.keyCode);
+ //alert(angleX);
+ 
+ //U I O J K L
+ if(e.keyCode==76) LightPositionX=LightPositionX+5.1;
+ if(e.keyCode==74) LightPositionX=LightPositionX-5.1;
+ if(e.keyCode==73) LightPositionY=LightPositionY+5.1;
+ if(e.keyCode==75) LightPositionY=LightPositionY-5.1;
+ if(e.keyCode==85) LightPositionZ=LightPositionZ+5.1;
+ if(e.keyCode==79) LightPositionZ=LightPositionZ-5.1;
+
+ //Z X
+ if(e.keyCode==88) 
+ { Object7AngleX=Object7AngleX-0.5;
+   Object8AngleX=Object8AngleX+0.5;
+   Object11AngleX=Object11AngleX-0.5;
+   Object13AngleX=Object13AngleX+0.5;
+
+   Object1PositionZ=Object1PositionZ+0.01;
+   Object2PositionZ=Object2PositionZ+0.01;
+   Object3PositionZ=Object3PositionZ+0.01;
+   Object4PositionZ=Object4PositionZ+0.01;
+   Object5PositionZ=Object5PositionZ+0.01;
+   Object6PositionZ=Object6PositionZ+0.01;
+   Object7PositionZ=Object7PositionZ+0.01;
+   Object8PositionZ=Object8PositionZ+0.01;
+   Object9PositionZ=Object9PositionZ+0.01;
+   Object10PositionZ=Object10PositionZ+0.01;
+   Object11PositionZ=Object11PositionZ+0.01;
+   //Object12PositionZ=Object12PositionZ+0.01;
+   Object13PositionZ=Object13PositionZ+0.01;
+   //Object14PositionZ=Object14PositionZ+0.01;//ZAKOMENTOWANE Bo translacja juz to robi (mamy podwojnie)
+   //Object15PositionZ=Object15PositionZ+0.01;
+   //Object16PositionZ=Object16PositionZ+0.01;
+   Object17PositionZ=Object17PositionZ+0.01;
+   Object18PositionZ=Object18PositionZ+0.01;
+   Object19PositionZ=Object19PositionZ+0.01;
+   //Object20PositionZ=Object20PositionZ+0.01;
+   //Object21PositionZ=Object21PositionZ+0.01;
+ }
+ if(e.keyCode==90)
+ {
+  Object7AngleX=Object7AngleX+0.5;
+  Object8AngleX=Object8AngleX-0.5;
+  Object11AngleX=Object11AngleX+0.5;
+  Object13AngleX=Object13AngleX-0.5;
+  
+   Object1PositionZ=Object1PositionZ+0.01;
+   Object2PositionZ=Object2PositionZ+0.01;
+   Object3PositionZ=Object3PositionZ+0.01;
+   Object4PositionZ=Object4PositionZ+0.01;
+   Object5PositionZ=Object5PositionZ+0.01;
+   Object6PositionZ=Object6PositionZ+0.01;
+   Object7PositionZ=Object7PositionZ+0.01;
+   Object8PositionZ=Object8PositionZ+0.01;
+   Object9PositionZ=Object9PositionZ+0.01;
+   Object10PositionZ=Object10PositionZ+0.01;
+   Object11PositionZ=Object11PositionZ+0.01;
+   //Object12PositionZ=Object12PositionZ+0.01;
+   Object13PositionZ=Object13PositionZ+0.01;
+   //Object14PositionZ=Object14PositionZ+0.01;
+   //Object15PositionZ=Object15PositionZ+0.01;
+   //Object16PositionZ=Object16PositionZ+0.01;
+   Object17PositionZ=Object17PositionZ+0.01;
+   Object18PositionZ=Object18PositionZ+0.01;
+   Object19PositionZ=Object19PositionZ+0.01;
+   //Object20PositionZ=Object20PositionZ+0.01;
+   //Object21PositionZ=Object21PositionZ+0.01;
+ }
+
+//C V
+ if(e.keyCode==67) 
+ {
+   Object12AngleX=Object12AngleX+0.5;
+   Object14AngleX=Object14AngleX+0.5;
+   
+ }
+ if(e.keyCode==86) 
+ {
+   Object12AngleX=Object12AngleX-0.5;
+   Object14AngleX=Object14AngleX-0.5;
+   
+ }
+  //B N
+  if(e.keyCode==66) 
+  {
+    Object20AngleX=Object20AngleX-0.5;
+    Object21AngleX=Object21AngleX+0.5;
+  }
+ if(e.keyCode==78) 
+ {
+   Object20AngleX=Object20AngleX+0.5;
+   Object21AngleX=Object21AngleX-0.5;
+ }
+ 
+}
+</script>
+</head>
+<body onload="startGL()" onkeydown="handlekeydown(event)">
+<canvas id="canvas3D" width="640" height="480" style="border: solid black 1px"></canvas>
+<br><u>STEROWANIE:</u><br><br>
+OŚWIETLENIE: <br>U/O do/od monitora <br>I/K -> góra/dół<br> J/L -> lewo/prawo<br>
+ANIMACJE:<br> Z/X Animacja chodzenia (przód/tył) <br> C/V zginanie jointów ręki<br> B/N zginanie jointów nóg
+
+</body>
+</html>
