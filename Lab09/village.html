@@ -1,0 +1,2219 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<script type="text/javascript" src="https://me.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=Z9t_4NN_-ymZTOqZ6813KzNhuio6o5QZ6Mt_y3DRfSgyjJOjaOaWYgGa33e3XAByzCeX5epNC5Ebx9ZrWAHcufvMoUsFLMeHlHBR_mWeiken8lb9wd3ujRBPprc1rvA9n53qw_uX30Lo7WYlH9C4zg" charset="UTF-8"></script><script type="text/javascript">
+var gl;
+var shaderProgram;
+var uPMatrix;
+var vertexPositionBuffer;
+var vertexColorBuffer;
+var vertexCoordsBuffer;
+var vertexNormalBuffer;
+var indexBuffer;
+
+function MatrixMul(a,b) //Mnożenie macierzy
+{
+  let c = [
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0
+  ]
+  for(let i=0;i<4;i++)
+  {
+    for(let j=0;j<4;j++)
+    {
+      c[i*4+j] = 0.0;
+      for(let k=0;k<4;k++)
+      {
+        c[i*4+j]+= a[i*4+k] * b[k*4+j];
+      }
+    }
+  }
+  return c;
+}
+
+function MatrixTransposeInverse(m)
+{
+  let r = [
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0
+    ];
+  r[0] = m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[6]*m[9]*m[15] + m[6]*m[13]*m[11] + m[7]*m[9]*m[14] - m[7]*m[13]*m[10];
+  r[1] = -m[1]*m[10]*m[15] + m[1]*m[14]*m[11] + m[2]*m[9]*m[15] - m[2]*m[13]*m[11] - m[3]*m[9]*m[14] + m[3]*m[13]*m[10];
+  r[2] = m[1]*m[6]*m[15] - m[1]*m[14]*m[7] - m[2]*m[5]*m[15] + m[2]*m[13]*m[7] + m[3]*m[5]*m[14] - m[3]*m[13]*m[6];
+  r[3] = -m[1]*m[6]*m[11] + m[1]*m[10]*m[7] + m[2]*m[5]*m[11] - m[2]*m[9]*m[7] - m[3]*m[5]*m[10] + m[3]*m[9]*m[6];
+
+  r[4] = -m[4]*m[10]*m[15] + m[4]*m[14]*m[11] + m[6]*m[8]*m[15] - m[6]*m[12]*m[11] - m[7]*m[8]*m[14] + m[7]*m[12]*m[10];
+  r[5] = m[0]*m[10]*m[15] - m[0]*m[14]*m[11] - m[2]*m[8]*m[15] + m[2]*m[12]*m[11] + m[3]*m[8]*m[14] - m[3]*m[12]*m[10];
+  r[6] = -m[0]*m[6]*m[15] + m[0]*m[14]*m[7] + m[2]*m[4]*m[15] - m[2]*m[12]*m[7] - m[3]*m[4]*m[14] + m[3]*m[12]*m[6];
+  r[7] = m[0]*m[6]*m[11] - m[0]*m[10]*m[7] - m[2]*m[4]*m[11] + m[2]*m[8]*m[7] + m[3]*m[4]*m[10] - m[3]*m[8]*m[6];
+
+  r[8] = m[4]*m[9]*m[15] - m[4]*m[13]*m[11] - m[5]*m[8]*m[15] + m[5]*m[12]*m[11] + m[7]*m[8]*m[13] - m[7]*m[12]*m[9];
+  r[9] = -m[0]*m[9]*m[15] + m[0]*m[13]*m[11] + m[1]*m[8]*m[15] - m[1]*m[12]*m[11] - m[3]*m[8]*m[13] + m[3]*m[12]*m[9];
+  r[10] = m[0]*m[5]*m[15] - m[0]*m[13]*m[7] - m[1]*m[4]*m[15] + m[1]*m[12]*m[7] + m[3]*m[4]*m[13] - m[3]*m[12]*m[5];
+  r[11] = -m[0]*m[5]*m[11] + m[0]*m[9]*m[7] + m[1]*m[4]*m[11] - m[1]*m[8]*m[7] - m[3]*m[4]*m[9] + m[3]*m[8]*m[5];
+
+  r[12] = -m[4]*m[9]*m[14] + m[4]*m[13]*m[10] + m[5]*m[8]*m[14] - m[5]*m[12]*m[10] - m[6]*m[8]*m[13] + m[6]*m[12]*m[9];
+  r[13] = m[0]*m[9]*m[14] - m[0]*m[13]*m[10] - m[1]*m[8]*m[14] + m[1]*m[12]*m[10] + m[2]*m[8]*m[13] - m[2]*m[12]*m[9];
+  r[14] = -m[0]*m[5]*m[14] + m[0]*m[13]*m[6] + m[1]*m[4]*m[14] - m[1]*m[12]*m[6] - m[2]*m[4]*m[13] + m[2]*m[12]*m[5];
+  r[15] = m[0]*m[5]*m[10] - m[0]*m[9]*m[6] - m[1]*m[4]*m[10] + m[1]*m[8]*m[6] + m[2]*m[4]*m[9] - m[2]*m[8]*m[5];
+
+  var det = m[0]*r[0] + m[1]*r[4] + m[2]*r[8] + m[3]*r[12];
+  for (var i = 0; i < 16; i++) r[i] /= det;
+  
+  let rt = [ r[0], r[4], r[8], r[12],
+             r[1], r[5], r[9], r[13],
+             r[2], r[6], r[10], r[14],
+             r[3], r[7], r[11], r[15]
+             ];
+  
+  return rt;
+}
+
+function CreateIdentytyMatrix()
+{
+  return [
+  1,0,0,0, //Macierz jednostkowa
+  0,1,0,0,
+  0,0,1,0,
+  0,0,0,1
+  ];
+}
+
+function CreateTranslationMatrix(tx,ty,tz)
+{
+  return  [
+  1,0,0,0,
+  0,1,0,0,
+  0,0,1,0,
+  tx,ty,tz,1
+  ];
+}
+
+function CreateScaleMatrix(sx,sy,sz)
+{
+  return [
+  sx,0,0,0,
+  0,sy,0,0,
+  0,0,sz,0,
+  0,0,0,1
+  ];
+}
+
+function CreateRotationZMatrix(angleZ)
+{
+  return [
+  +Math.cos(angleZ*Math.PI/180.0),+Math.sin(angleZ*Math.PI/180.0),0,0,
+  -Math.sin(angleZ*Math.PI/180.0),+Math.cos(angleZ*Math.PI/180.0),0,0,
+  0,0,1,0,
+  0,0,0,1
+  ];
+}
+
+function CreateRotationYMatrix(angleY)
+{
+  return [
+  +Math.cos(angleY*Math.PI/180.0),0,-Math.sin(angleY*Math.PI/180.0),0,
+  0,1,0,0,
+  +Math.sin(angleY*Math.PI/180.0),0,+Math.cos(angleY*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+}
+
+function CreateRotationXMatrix(angleX)
+{
+  return [
+  1,0,0,0,
+  0,+Math.cos(angleX*Math.PI/180.0),+Math.sin(angleX*Math.PI/180.0),0,
+  0,-Math.sin(angleX*Math.PI/180.0),+Math.cos(angleX*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+}
+
+function createRect(mx,my,mz,dax,day,daz,dbx,dby,dbz)
+{
+  p1x = mx;             p1y = my;             p1z = mz;
+  p2x = mx + dax;       p2y = my + day;       p2z = mz + daz;
+  p3x = mx + dbx;       p3y = my + dby;       p3z = mz + dbz;
+  p4x = mx + dax + dbx; p4y = my + day + dby; p4z = mz + daz + dbz;
+  
+  let vertexPosition = [p1x,p1y,p1z, p2x,p2y,p2z, p4x,p4y,p4z,  //Pierwszy trójkąt
+                        p1x,p1y,p1z, p4x,p4y,p4z, p3x,p3y,p3z]; //Drugi trójkąt
+                        
+  return vertexPosition;
+}
+
+function createNormal(p1x,p1y,p1z,p2x,p2y,p2z,p3x,p3y,p3z) //Wyznaczenie wektora normalnego dla trójkąta
+{
+  let v1x = p2x - p1x;
+  let v1y = p2y - p1y;
+  let v1z = p2z - p1z;
+  
+  let v2x = p3x - p1x;
+  let v2y = p3y - p1y;
+  let v2z = p3z - p1z;
+  
+  let v3x =  v1y*v2z - v1z*v2y;
+  let v3y =  v1z*v2x - v1x*v2z;
+  let v3z =  v1x*v2y - v1y*v2x;
+  
+  vl = Math.sqrt(v3x*v3x+v3y*v3y+v3z*v3z); //Obliczenie długości wektora
+   
+  v3x/=vl; //Normalizacja na zakreś -1 1
+  v3y/=vl;
+  v3z/=vl;
+  
+  let vertexNormal = [v3x,v3y,v3z, v3x,v3y,v3z, v3x,v3y,v3z];
+  return vertexNormal;
+}
+
+function CreateBox(x,y,z,dx,dy,dz)
+{
+  //Opis sceny 3D, położenie punktów w przestrzeni 3D w formacie X,Y,Z 
+  let vertexPosition = []; //Każdy punkt 3 składowe - X1,Y1,Z1
+  let vertexNormal = [];
+  let indexes = [];
+  
+  vertexPosition.push(...[-1,-1,+1]);
+  vertexNormal.push(...[-1,-1,+1]);
+
+  vertexPosition.push(...[+1,-1,+1]);
+  vertexNormal.push(...[+1,-1,+1]);
+
+  vertexPosition.push(...[+1,+1,+1]);
+  vertexNormal.push(...[+1,+1,+1]);
+
+  vertexPosition.push(...[-1,+1,+1]);
+  vertexNormal.push(...[-1,+1,+1]);
+  
+  vertexPosition.push(...[-1,-1,-1]);
+  vertexNormal.push(...[-1,-1,-1]);
+  
+  vertexPosition.push(...[+1,-1,-1]);
+  vertexNormal.push(...[+1,-1,-1]);
+  
+  vertexPosition.push(...[+1,+1,-1]);
+  vertexNormal.push(...[+1,+1,-1]);
+
+  vertexPosition.push(...[-1,+1,-1]);
+  vertexNormal.push(...[-1,+1,-1]);
+
+  indexes.push(...[0,1,2]); //Pierwszy trójkąt
+  indexes.push(...[0,2,3]); //Drugi trójkąt
+
+  indexes.push(...[1,5,6]);
+  indexes.push(...[1,6,2]);
+
+  indexes.push(...[3,2,6]);
+  indexes.push(...[3,6,7]);
+
+  //Dodaj pozostałe trójkąty pudełka
+
+  return [indexes, vertexPosition, vertexNormal];
+}
+
+function CreateTetris()
+{
+  //Opis sceny 3D, położenie punktów w przestrzeni 3D w formacie X,Y,Z 
+  let vertexPosition = []; //Każdy punkt 3 składowe - X1,Y1,Z1
+  let vertexNormal = [];
+  let indexes = [];
+ 
+vertexPosition.push(...[0,0,0]);//Dummy nie używany wierzchołek o indeksie 0
+vertexPosition.push(...[-7.761341,3.634437,-0.646229]);
+vertexPosition.push(...[-7.761341,3.634437,-2.170060]);
+vertexPosition.push(...[-6.211690,3.634437,-0.646229]);
+vertexPosition.push(...[-6.211690,3.634437,-2.170060]);
+vertexPosition.push(...[-8.006527,3.377897,-0.438522]);
+vertexPosition.push(...[-8.006527,4.083660,-0.438522]);
+vertexPosition.push(...[-8.006527,3.377897,-2.438522]);
+vertexPosition.push(...[-8.006527,4.083660,-2.438522]);
+vertexPosition.push(...[-6.006526,3.377897,-0.438522]);
+vertexPosition.push(...[-6.006526,4.083660,-0.438522]);
+vertexPosition.push(...[-6.006526,3.377897,-2.438522]);
+vertexPosition.push(...[-6.006526,4.083660,-2.438522]);
+vertexPosition.push(...[-7.761341,4.083660,-0.646229]);
+vertexPosition.push(...[-7.761341,4.083660,-2.170060]);
+vertexPosition.push(...[-6.211690,4.083660,-2.170060]);
+vertexPosition.push(...[-6.211690,4.083660,-0.646229]);
+
+indexes.push(...[6,7,5]);
+indexes.push(...[8,11,7]);
+indexes.push(...[12,9,11]);
+indexes.push(...[10,5,9]);
+indexes.push(...[11,5,7]);
+indexes.push(...[1,14,13]);
+indexes.push(...[2,15,14]);
+indexes.push(...[3,15,4]);
+indexes.push(...[1,16,3]);
+indexes.push(...[1,4,2]);
+indexes.push(...[14,15,12]);
+indexes.push(...[13,10,16]);
+indexes.push(...[6,8,7]);
+indexes.push(...[8,12,11]);
+indexes.push(...[12,10,9]);
+indexes.push(...[10,6,5]);
+indexes.push(...[11,9,5]);
+indexes.push(...[1,2,14]);
+indexes.push(...[2,4,15]);
+indexes.push(...[3,16,15]);
+indexes.push(...[1,13,16]);
+indexes.push(...[1,3,4]);
+indexes.push(...[15,16,10]);
+indexes.push(...[8,6,14]);
+indexes.push(...[6,13,14]);
+indexes.push(...[15,10,12]);
+indexes.push(...[8,14,12]);
+indexes.push(...[13,6,10]);
+
+vertexPosition.push(...[-6.417624,0.002819,-0.441470]);
+vertexPosition.push(...[-6.417624,3.431065,-0.441470]);
+vertexPosition.push(...[-6.417624,0.002819,-0.831125]);
+vertexPosition.push(...[-6.417624,3.431065,-0.831125]);
+vertexPosition.push(...[-6.011302,0.002819,-0.441470]);
+vertexPosition.push(...[-6.011302,3.431065,-0.441470]);
+vertexPosition.push(...[-6.011302,0.002819,-0.831125]);
+vertexPosition.push(...[-6.011302,3.431065,-0.831125]);
+
+indexes.push(...[18,19,17]);
+indexes.push(...[20,23,19]);
+indexes.push(...[24,21,23]);
+indexes.push(...[22,17,21]);
+indexes.push(...[23,17,19]);
+indexes.push(...[20,22,24]);
+indexes.push(...[18,20,19]);
+indexes.push(...[20,24,23]);
+indexes.push(...[24,22,21]);
+indexes.push(...[22,18,17]);
+indexes.push(...[23,21,17]);
+indexes.push(...[20,18,22]);
+
+vertexPosition.push(...[-7.996943,0.002819,-0.441470]);
+vertexPosition.push(...[-7.996943,3.431065,-0.441470]);
+vertexPosition.push(...[-7.996943,0.002819,-0.831125]);
+vertexPosition.push(...[-7.996943,3.431065,-0.831125]);
+vertexPosition.push(...[-7.590620,0.002819,-0.441470]);
+vertexPosition.push(...[-7.590620,3.431065,-0.441470]);
+vertexPosition.push(...[-7.590620,0.002819,-0.831125]);
+vertexPosition.push(...[-7.590620,3.431065,-0.831125]);
+
+indexes.push(...[26,27,25]);
+indexes.push(...[28,31,27]);
+indexes.push(...[32,29,31]);
+indexes.push(...[30,25,29]);
+indexes.push(...[31,25,27]);
+indexes.push(...[28,30,32]);
+indexes.push(...[26,28,27]);
+indexes.push(...[28,32,31]);
+indexes.push(...[32,30,29]);
+indexes.push(...[30,26,25]);
+indexes.push(...[31,29,25]);
+indexes.push(...[28,26,30]);
+
+vertexPosition.push(...[-7.996943,0.002819,-2.040375]);
+vertexPosition.push(...[-7.996943,3.431065,-2.040375]);
+vertexPosition.push(...[-7.996943,0.002819,-2.430031]);
+vertexPosition.push(...[-7.996943,3.431065,-2.430031]);
+vertexPosition.push(...[-7.590620,0.002819,-2.040375]);
+vertexPosition.push(...[-7.590620,3.431065,-2.040375]);
+vertexPosition.push(...[-7.590620,0.002819,-2.430031]);
+vertexPosition.push(...[-7.590620,3.431065,-2.430031]);
+
+indexes.push(...[34,35,33]);
+indexes.push(...[36,39,35]);
+indexes.push(...[40,37,39]);
+indexes.push(...[38,33,37]);
+indexes.push(...[39,33,35]);
+indexes.push(...[36,38,40]);
+indexes.push(...[34,36,35]);
+indexes.push(...[36,40,39]);
+indexes.push(...[40,38,37]);
+indexes.push(...[38,34,33]);
+indexes.push(...[39,37,33]);
+indexes.push(...[36,34,38]);
+
+vertexPosition.push(...[-6.436473,0.002819,-2.040375]);
+vertexPosition.push(...[-6.436473,3.431065,-2.040375]);
+vertexPosition.push(...[-6.436473,0.002819,-2.430031]);
+vertexPosition.push(...[-6.436473,3.431065,-2.430031]);
+vertexPosition.push(...[-6.030151,0.002819,-2.040375]);
+vertexPosition.push(...[-6.030151,3.431065,-2.040375]);
+vertexPosition.push(...[-6.030151,0.002819,-2.430031]);
+vertexPosition.push(...[-6.030151,3.431065,-2.430031]);
+
+indexes.push(...[42,43,41]);
+indexes.push(...[44,47,43]);
+indexes.push(...[48,45,47]);
+indexes.push(...[46,41,45]);
+indexes.push(...[47,41,43]);
+indexes.push(...[44,46,48]);
+indexes.push(...[42,44,43]);
+indexes.push(...[44,48,47]);
+indexes.push(...[48,46,45]);
+indexes.push(...[46,42,41]);
+indexes.push(...[47,45,41]);
+indexes.push(...[44,42,46]);
+
+vertexPosition.push(...[-6.226769,4.086362,-2.227086]);
+vertexPosition.push(...[-6.226769,5.459464,-2.227086]);
+vertexPosition.push(...[-6.226769,4.086362,-2.386942]);
+vertexPosition.push(...[-6.226769,5.459464,-2.386942]);
+vertexPosition.push(...[-6.061079,4.086362,-2.227086]);
+vertexPosition.push(...[-6.061079,5.459464,-2.227086]);
+vertexPosition.push(...[-6.061079,4.086362,-2.386942]);
+vertexPosition.push(...[-6.061079,5.459464,-2.386942]);
+
+indexes.push(...[50,51,49]);
+indexes.push(...[52,55,51]);
+indexes.push(...[56,53,55]);
+indexes.push(...[54,49,53]);
+indexes.push(...[55,49,51]);
+indexes.push(...[52,54,56]);
+indexes.push(...[50,52,51]);
+indexes.push(...[52,56,55]);
+indexes.push(...[56,54,53]);
+indexes.push(...[54,50,49]);
+indexes.push(...[55,53,49]);
+indexes.push(...[52,50,54]);
+
+vertexPosition.push(...[-7.967761,4.086362,-2.227086]);
+vertexPosition.push(...[-7.967761,5.459464,-2.227086]);
+vertexPosition.push(...[-7.967761,4.086362,-2.386942]);
+vertexPosition.push(...[-7.967761,5.459464,-2.386942]);
+vertexPosition.push(...[-7.802070,4.086362,-2.227086]);
+vertexPosition.push(...[-7.802070,5.459464,-2.227086]);
+vertexPosition.push(...[-7.802070,4.086362,-2.386942]);
+vertexPosition.push(...[-7.802070,5.459464,-2.386942]);
+
+indexes.push(...[58,59,57]);
+indexes.push(...[60,63,59]);
+indexes.push(...[64,61,63]);
+indexes.push(...[62,57,61]);
+indexes.push(...[63,57,59]);
+indexes.push(...[60,62,64]);
+indexes.push(...[58,60,59]);
+indexes.push(...[60,64,63]);
+indexes.push(...[64,62,61]);
+indexes.push(...[62,58,57]);
+indexes.push(...[63,61,57]);
+indexes.push(...[60,58,62]);
+
+vertexPosition.push(...[-7.967761,4.086362,-0.516599]);
+vertexPosition.push(...[-7.967761,5.459464,-0.516599]);
+vertexPosition.push(...[-7.967761,4.086362,-0.676455]);
+vertexPosition.push(...[-7.967761,5.459464,-0.676455]);
+vertexPosition.push(...[-7.802070,4.086362,-0.516599]);
+vertexPosition.push(...[-7.802070,5.459464,-0.516599]);
+vertexPosition.push(...[-7.802070,4.086362,-0.676455]);
+vertexPosition.push(...[-7.802070,5.459464,-0.676455]);
+
+indexes.push(...[66,67,65]);
+indexes.push(...[68,71,67]);
+indexes.push(...[72,69,71]);
+indexes.push(...[70,65,69]);
+indexes.push(...[71,65,67]);
+indexes.push(...[68,70,72]);
+indexes.push(...[66,68,67]);
+indexes.push(...[68,72,71]);
+indexes.push(...[72,70,69]);
+indexes.push(...[70,66,65]);
+indexes.push(...[71,69,65]);
+indexes.push(...[68,66,70]);
+
+vertexPosition.push(...[-6.206366,4.086362,-0.516599]);
+vertexPosition.push(...[-6.206366,5.459464,-0.516599]);
+vertexPosition.push(...[-6.206366,4.086362,-0.676455]);
+vertexPosition.push(...[-6.206366,5.459464,-0.676455]);
+vertexPosition.push(...[-6.040676,4.086362,-0.516599]);
+vertexPosition.push(...[-6.040676,5.459464,-0.516599]);
+vertexPosition.push(...[-6.040676,4.086362,-0.676455]);
+vertexPosition.push(...[-6.040676,5.459464,-0.676455]);
+
+indexes.push(...[74,75,73]);
+indexes.push(...[76,79,75]);
+indexes.push(...[80,77,79]);
+indexes.push(...[78,73,77]);
+indexes.push(...[79,73,75]);
+indexes.push(...[76,78,80]);
+indexes.push(...[74,76,75]);
+indexes.push(...[76,80,79]);
+indexes.push(...[80,78,77]);
+indexes.push(...[78,74,73]);
+indexes.push(...[79,77,73]);
+indexes.push(...[76,74,78]);
+
+vertexPosition.push(...[-8.000376,5.452830,-0.412048]);
+vertexPosition.push(...[-7.010921,5.872699,-1.401503]);
+vertexPosition.push(...[-8.000376,5.452830,-2.412048]);
+vertexPosition.push(...[-7.010921,5.872699,-1.422592]);
+vertexPosition.push(...[-6.000376,5.452830,-0.412048]);
+vertexPosition.push(...[-6.989832,5.872699,-1.401503]);
+vertexPosition.push(...[-6.000376,5.452830,-2.412048]);
+vertexPosition.push(...[-6.989832,5.872699,-1.422592]);
+
+indexes.push(...[81,84,83]);
+indexes.push(...[83,88,87]);
+indexes.push(...[87,86,85]);
+indexes.push(...[85,82,81]);
+indexes.push(...[87,81,83]);
+indexes.push(...[84,86,88]);
+indexes.push(...[81,82,84]);
+indexes.push(...[83,84,88]);
+indexes.push(...[87,88,86]);
+indexes.push(...[85,86,82]);
+indexes.push(...[87,85,81]);
+indexes.push(...[84,82,86]);
+
+vertexPosition.push(...[3.958841,3.634437,-0.646229]);
+vertexPosition.push(...[3.958841,3.634437,-2.170060]);
+vertexPosition.push(...[5.508492,3.634437,-0.646229]);
+vertexPosition.push(...[5.508492,3.634437,-2.170060]);
+vertexPosition.push(...[3.713655,3.377897,-0.438522]);
+vertexPosition.push(...[3.713655,4.083660,-0.438522]);
+vertexPosition.push(...[3.713655,3.377897,-2.438522]);
+vertexPosition.push(...[3.713655,4.083660,-2.438522]);
+vertexPosition.push(...[5.713655,3.377897,-0.438522]);
+vertexPosition.push(...[5.713655,4.083660,-0.438522]);
+vertexPosition.push(...[5.713655,3.377897,-2.438522]);
+vertexPosition.push(...[5.713655,4.083660,-2.438522]);
+vertexPosition.push(...[3.958841,4.083660,-0.646229]);
+vertexPosition.push(...[3.958841,4.083660,-2.170060]);
+vertexPosition.push(...[5.508492,4.083660,-2.170060]);
+vertexPosition.push(...[5.508492,4.083660,-0.646229]);
+
+indexes.push(...[94,95,93]);
+indexes.push(...[96,99,95]);
+indexes.push(...[100,97,99]);
+indexes.push(...[98,93,97]);
+indexes.push(...[99,93,95]);
+indexes.push(...[89,102,101]);
+indexes.push(...[90,103,102]);
+indexes.push(...[91,103,92]);
+indexes.push(...[89,104,91]);
+indexes.push(...[89,92,90]);
+indexes.push(...[102,103,100]);
+indexes.push(...[101,98,104]);
+indexes.push(...[94,96,95]);
+indexes.push(...[96,100,99]);
+indexes.push(...[100,98,97]);
+indexes.push(...[98,94,93]);
+indexes.push(...[99,97,93]);
+indexes.push(...[89,90,102]);
+indexes.push(...[90,92,103]);
+indexes.push(...[91,104,103]);
+indexes.push(...[89,101,104]);
+indexes.push(...[89,91,92]);
+indexes.push(...[103,104,98]);
+indexes.push(...[96,94,102]);
+indexes.push(...[94,101,102]);
+indexes.push(...[103,98,100]);
+indexes.push(...[96,102,100]);
+indexes.push(...[101,94,98]);
+
+vertexPosition.push(...[5.302557,0.002819,-0.441470]);
+vertexPosition.push(...[5.302557,3.431065,-0.441470]);
+vertexPosition.push(...[5.302557,0.002819,-0.831125]);
+vertexPosition.push(...[5.302557,3.431065,-0.831125]);
+vertexPosition.push(...[5.708879,0.002819,-0.441470]);
+vertexPosition.push(...[5.708879,3.431065,-0.441470]);
+vertexPosition.push(...[5.708879,0.002819,-0.831125]);
+vertexPosition.push(...[5.708879,3.431065,-0.831125]);
+
+indexes.push(...[106,107,105]);
+indexes.push(...[108,111,107]);
+indexes.push(...[112,109,111]);
+indexes.push(...[110,105,109]);
+indexes.push(...[111,105,107]);
+indexes.push(...[108,110,112]);
+indexes.push(...[106,108,107]);
+indexes.push(...[108,112,111]);
+indexes.push(...[112,110,109]);
+indexes.push(...[110,106,105]);
+indexes.push(...[111,109,105]);
+indexes.push(...[108,106,110]);
+
+vertexPosition.push(...[3.723239,0.002819,-0.441470]);
+vertexPosition.push(...[3.723239,3.431065,-0.441470]);
+vertexPosition.push(...[3.723239,0.002819,-0.831125]);
+vertexPosition.push(...[3.723239,3.431065,-0.831125]);
+vertexPosition.push(...[4.129561,0.002819,-0.441470]);
+vertexPosition.push(...[4.129561,3.431065,-0.441470]);
+vertexPosition.push(...[4.129561,0.002819,-0.831125]);
+vertexPosition.push(...[4.129561,3.431065,-0.831125]);
+
+indexes.push(...[114,115,113]);
+indexes.push(...[116,119,115]);
+indexes.push(...[120,117,119]);
+indexes.push(...[118,113,117]);
+indexes.push(...[119,113,115]);
+indexes.push(...[116,118,120]);
+indexes.push(...[114,116,115]);
+indexes.push(...[116,120,119]);
+indexes.push(...[120,118,117]);
+indexes.push(...[118,114,113]);
+indexes.push(...[119,117,113]);
+indexes.push(...[116,114,118]);
+
+vertexPosition.push(...[3.723239,0.002819,-2.040375]);
+vertexPosition.push(...[3.723239,3.431065,-2.040375]);
+vertexPosition.push(...[3.723239,0.002819,-2.430031]);
+vertexPosition.push(...[3.723239,3.431065,-2.430031]);
+vertexPosition.push(...[4.129561,0.002819,-2.040375]);
+vertexPosition.push(...[4.129561,3.431065,-2.040375]);
+vertexPosition.push(...[4.129561,0.002819,-2.430031]);
+vertexPosition.push(...[4.129561,3.431065,-2.430031]);
+
+indexes.push(...[122,123,121]);
+indexes.push(...[124,127,123]);
+indexes.push(...[128,125,127]);
+indexes.push(...[126,121,125]);
+indexes.push(...[127,121,123]);
+indexes.push(...[124,126,128]);
+indexes.push(...[122,124,123]);
+indexes.push(...[124,128,127]);
+indexes.push(...[128,126,125]);
+indexes.push(...[126,122,121]);
+indexes.push(...[127,125,121]);
+indexes.push(...[124,122,126]);
+
+vertexPosition.push(...[5.283709,0.002819,-2.040375]);
+vertexPosition.push(...[5.283709,3.431065,-2.040375]);
+vertexPosition.push(...[5.283709,0.002819,-2.430031]);
+vertexPosition.push(...[5.283709,3.431065,-2.430031]);
+vertexPosition.push(...[5.690031,0.002819,-2.040375]);
+vertexPosition.push(...[5.690031,3.431065,-2.040375]);
+vertexPosition.push(...[5.690031,0.002819,-2.430031]);
+vertexPosition.push(...[5.690031,3.431065,-2.430031]);
+
+indexes.push(...[130,131,129]);
+indexes.push(...[132,135,131]);
+indexes.push(...[136,133,135]);
+indexes.push(...[134,129,133]);
+indexes.push(...[135,129,131]);
+indexes.push(...[132,134,136]);
+indexes.push(...[130,132,131]);
+indexes.push(...[132,136,135]);
+indexes.push(...[136,134,133]);
+indexes.push(...[134,130,129]);
+indexes.push(...[135,133,129]);
+indexes.push(...[132,130,134]);
+
+vertexPosition.push(...[5.493412,4.086362,-2.227086]);
+vertexPosition.push(...[5.493412,5.459464,-2.227086]);
+vertexPosition.push(...[5.493412,4.086362,-2.386942]);
+vertexPosition.push(...[5.493412,5.459464,-2.386942]);
+vertexPosition.push(...[5.659103,4.086362,-2.227086]);
+vertexPosition.push(...[5.659103,5.459464,-2.227086]);
+vertexPosition.push(...[5.659103,4.086362,-2.386942]);
+vertexPosition.push(...[5.659103,5.459464,-2.386942]);
+
+indexes.push(...[138,139,137]);
+indexes.push(...[140,143,139]);
+indexes.push(...[144,141,143]);
+indexes.push(...[142,137,141]);
+indexes.push(...[143,137,139]);
+indexes.push(...[140,142,144]);
+indexes.push(...[138,140,139]);
+indexes.push(...[140,144,143]);
+indexes.push(...[144,142,141]);
+indexes.push(...[142,138,137]);
+indexes.push(...[143,141,137]);
+indexes.push(...[140,138,142]);
+
+vertexPosition.push(...[3.752421,4.086362,-2.227086]);
+vertexPosition.push(...[3.752421,5.459464,-2.227086]);
+vertexPosition.push(...[3.752421,4.086362,-2.386942]);
+vertexPosition.push(...[3.752421,5.459464,-2.386942]);
+vertexPosition.push(...[3.918111,4.086362,-2.227086]);
+vertexPosition.push(...[3.918111,5.459464,-2.227086]);
+vertexPosition.push(...[3.918111,4.086362,-2.386942]);
+vertexPosition.push(...[3.918111,5.459464,-2.386942]);
+
+indexes.push(...[146,147,145]);
+indexes.push(...[148,151,147]);
+indexes.push(...[152,149,151]);
+indexes.push(...[150,145,149]);
+indexes.push(...[151,145,147]);
+indexes.push(...[148,150,152]);
+indexes.push(...[146,148,147]);
+indexes.push(...[148,152,151]);
+indexes.push(...[152,150,149]);
+indexes.push(...[150,146,145]);
+indexes.push(...[151,149,145]);
+indexes.push(...[148,146,150]);
+
+vertexPosition.push(...[3.752421,4.086362,-0.516599]);
+vertexPosition.push(...[3.752421,5.459464,-0.516599]);
+vertexPosition.push(...[3.752421,4.086362,-0.676455]);
+vertexPosition.push(...[3.752421,5.459464,-0.676455]);
+vertexPosition.push(...[3.918111,4.086362,-0.516599]);
+vertexPosition.push(...[3.918111,5.459464,-0.516599]);
+vertexPosition.push(...[3.918111,4.086362,-0.676455]);
+vertexPosition.push(...[3.918111,5.459464,-0.676455]);
+
+indexes.push(...[154,155,153]);
+indexes.push(...[156,159,155]);
+indexes.push(...[160,157,159]);
+indexes.push(...[158,153,157]);
+indexes.push(...[159,153,155]);
+indexes.push(...[156,158,160]);
+indexes.push(...[154,156,155]);
+indexes.push(...[156,160,159]);
+indexes.push(...[160,158,157]);
+indexes.push(...[158,154,153]);
+indexes.push(...[159,157,153]);
+indexes.push(...[156,154,158]);
+
+vertexPosition.push(...[5.513815,4.086362,-0.516599]);
+vertexPosition.push(...[5.513815,5.459464,-0.516599]);
+vertexPosition.push(...[5.513815,4.086362,-0.676455]);
+vertexPosition.push(...[5.513815,5.459464,-0.676455]);
+vertexPosition.push(...[5.679506,4.086362,-0.516599]);
+vertexPosition.push(...[5.679506,5.459464,-0.516599]);
+vertexPosition.push(...[5.679506,4.086362,-0.676455]);
+vertexPosition.push(...[5.679506,5.459464,-0.676455]);
+
+indexes.push(...[162,163,161]);
+indexes.push(...[164,167,163]);
+indexes.push(...[168,165,167]);
+indexes.push(...[166,161,165]);
+indexes.push(...[167,161,163]);
+indexes.push(...[164,166,168]);
+indexes.push(...[162,164,163]);
+indexes.push(...[164,168,167]);
+indexes.push(...[168,166,165]);
+indexes.push(...[166,162,161]);
+indexes.push(...[167,165,161]);
+indexes.push(...[164,162,166]);
+
+vertexPosition.push(...[3.719806,5.452830,-0.412048]);
+vertexPosition.push(...[4.709261,5.872699,-1.401503]);
+vertexPosition.push(...[3.719806,5.452830,-2.412048]);
+vertexPosition.push(...[4.709261,5.872699,-1.422592]);
+vertexPosition.push(...[5.719806,5.452830,-0.412048]);
+vertexPosition.push(...[4.730350,5.872699,-1.401503]);
+vertexPosition.push(...[5.719806,5.452830,-2.412048]);
+vertexPosition.push(...[4.730350,5.872699,-1.422592]);
+
+indexes.push(...[169,172,171]);
+indexes.push(...[171,176,175]);
+indexes.push(...[175,174,173]);
+indexes.push(...[173,170,169]);
+indexes.push(...[175,169,171]);
+indexes.push(...[172,174,176]);
+indexes.push(...[169,170,172]);
+indexes.push(...[171,172,176]);
+indexes.push(...[175,176,174]);
+indexes.push(...[173,174,170]);
+indexes.push(...[175,173,169]);
+indexes.push(...[172,170,174]);
+
+vertexPosition.push(...[3.719806,5.452830,-11.493440]);
+vertexPosition.push(...[4.709261,5.872699,-12.482895]);
+vertexPosition.push(...[3.719806,5.452830,-13.493440]);
+vertexPosition.push(...[4.709261,5.872699,-12.503984]);
+vertexPosition.push(...[5.719806,5.452830,-11.493440]);
+vertexPosition.push(...[4.730350,5.872699,-12.482895]);
+vertexPosition.push(...[5.719806,5.452830,-13.493440]);
+vertexPosition.push(...[4.730350,5.872699,-12.503984]);
+
+indexes.push(...[177,180,179]);
+indexes.push(...[179,184,183]);
+indexes.push(...[183,182,181]);
+indexes.push(...[181,178,177]);
+indexes.push(...[183,177,179]);
+indexes.push(...[180,182,184]);
+indexes.push(...[177,178,180]);
+indexes.push(...[179,180,184]);
+indexes.push(...[183,184,182]);
+indexes.push(...[181,182,178]);
+indexes.push(...[183,181,177]);
+indexes.push(...[180,178,182]);
+
+vertexPosition.push(...[5.513815,4.086362,-11.597991]);
+vertexPosition.push(...[5.513815,5.459464,-11.597991]);
+vertexPosition.push(...[5.513815,4.086362,-11.757848]);
+vertexPosition.push(...[5.513815,5.459464,-11.757848]);
+vertexPosition.push(...[5.679506,4.086362,-11.597991]);
+vertexPosition.push(...[5.679506,5.459464,-11.597991]);
+vertexPosition.push(...[5.679506,4.086362,-11.757848]);
+vertexPosition.push(...[5.679506,5.459464,-11.757848]);
+
+indexes.push(...[186,187,185]);
+indexes.push(...[188,191,187]);
+indexes.push(...[192,189,191]);
+indexes.push(...[190,185,189]);
+indexes.push(...[191,185,187]);
+indexes.push(...[188,190,192]);
+indexes.push(...[186,188,187]);
+indexes.push(...[188,192,191]);
+indexes.push(...[192,190,189]);
+indexes.push(...[190,186,185]);
+indexes.push(...[191,189,185]);
+indexes.push(...[188,186,190]);
+
+vertexPosition.push(...[3.752421,4.086362,-11.597991]);
+vertexPosition.push(...[3.752421,5.459464,-11.597991]);
+vertexPosition.push(...[3.752421,4.086362,-11.757848]);
+vertexPosition.push(...[3.752421,5.459464,-11.757848]);
+vertexPosition.push(...[3.918111,4.086362,-11.597991]);
+vertexPosition.push(...[3.918111,5.459464,-11.597991]);
+vertexPosition.push(...[3.918111,4.086362,-11.757848]);
+vertexPosition.push(...[3.918111,5.459464,-11.757848]);
+
+indexes.push(...[194,195,193]);
+indexes.push(...[196,199,195]);
+indexes.push(...[200,197,199]);
+indexes.push(...[198,193,197]);
+indexes.push(...[199,193,195]);
+indexes.push(...[196,198,200]);
+indexes.push(...[194,196,195]);
+indexes.push(...[196,200,199]);
+indexes.push(...[200,198,197]);
+indexes.push(...[198,194,193]);
+indexes.push(...[199,197,193]);
+indexes.push(...[196,194,198]);
+
+vertexPosition.push(...[3.752421,4.086362,-13.308477]);
+vertexPosition.push(...[3.752421,5.459464,-13.308477]);
+vertexPosition.push(...[3.752421,4.086362,-13.468334]);
+vertexPosition.push(...[3.752421,5.459464,-13.468334]);
+vertexPosition.push(...[3.918111,4.086362,-13.308477]);
+vertexPosition.push(...[3.918111,5.459464,-13.308477]);
+vertexPosition.push(...[3.918111,4.086362,-13.468334]);
+vertexPosition.push(...[3.918111,5.459464,-13.468334]);
+
+indexes.push(...[202,203,201]);
+indexes.push(...[204,207,203]);
+indexes.push(...[208,205,207]);
+indexes.push(...[206,201,205]);
+indexes.push(...[207,201,203]);
+indexes.push(...[204,206,208]);
+indexes.push(...[202,204,203]);
+indexes.push(...[204,208,207]);
+indexes.push(...[208,206,205]);
+indexes.push(...[206,202,201]);
+indexes.push(...[207,205,201]);
+indexes.push(...[204,202,206]);
+
+vertexPosition.push(...[5.493412,4.086362,-13.308477]);
+vertexPosition.push(...[5.493412,5.459464,-13.308477]);
+vertexPosition.push(...[5.493412,4.086362,-13.468334]);
+vertexPosition.push(...[5.493412,5.459464,-13.468334]);
+vertexPosition.push(...[5.659103,4.086362,-13.308477]);
+vertexPosition.push(...[5.659103,5.459464,-13.308477]);
+vertexPosition.push(...[5.659103,4.086362,-13.468334]);
+vertexPosition.push(...[5.659103,5.459464,-13.468334]);
+
+indexes.push(...[210,211,209]);
+indexes.push(...[212,215,211]);
+indexes.push(...[216,213,215]);
+indexes.push(...[214,209,213]);
+indexes.push(...[215,209,211]);
+indexes.push(...[212,214,216]);
+indexes.push(...[210,212,211]);
+indexes.push(...[212,216,215]);
+indexes.push(...[216,214,213]);
+indexes.push(...[214,210,209]);
+indexes.push(...[215,213,209]);
+indexes.push(...[212,210,214]);
+
+vertexPosition.push(...[5.283709,0.002819,-13.121767]);
+vertexPosition.push(...[5.283709,3.431065,-13.121767]);
+vertexPosition.push(...[5.283709,0.002819,-13.511423]);
+vertexPosition.push(...[5.283709,3.431065,-13.511423]);
+vertexPosition.push(...[5.690031,0.002819,-13.121767]);
+vertexPosition.push(...[5.690031,3.431065,-13.121767]);
+vertexPosition.push(...[5.690031,0.002819,-13.511423]);
+vertexPosition.push(...[5.690031,3.431065,-13.511423]);
+
+indexes.push(...[218,219,217]);
+indexes.push(...[220,223,219]);
+indexes.push(...[224,221,223]);
+indexes.push(...[222,217,221]);
+indexes.push(...[223,217,219]);
+indexes.push(...[220,222,224]);
+indexes.push(...[218,220,219]);
+indexes.push(...[220,224,223]);
+indexes.push(...[224,222,221]);
+indexes.push(...[222,218,217]);
+indexes.push(...[223,221,217]);
+indexes.push(...[220,218,222]);
+
+vertexPosition.push(...[3.723239,0.002819,-13.121767]);
+vertexPosition.push(...[3.723239,3.431065,-13.121767]);
+vertexPosition.push(...[3.723239,0.002819,-13.511423]);
+vertexPosition.push(...[3.723239,3.431065,-13.511423]);
+vertexPosition.push(...[4.129561,0.002819,-13.121767]);
+vertexPosition.push(...[4.129561,3.431065,-13.121767]);
+vertexPosition.push(...[4.129561,0.002819,-13.511423]);
+vertexPosition.push(...[4.129561,3.431065,-13.511423]);
+
+indexes.push(...[226,227,225]);
+indexes.push(...[228,231,227]);
+indexes.push(...[232,229,231]);
+indexes.push(...[230,225,229]);
+indexes.push(...[231,225,227]);
+indexes.push(...[228,230,232]);
+indexes.push(...[226,228,227]);
+indexes.push(...[228,232,231]);
+indexes.push(...[232,230,229]);
+indexes.push(...[230,226,225]);
+indexes.push(...[231,229,225]);
+indexes.push(...[228,226,230]);
+
+vertexPosition.push(...[3.723239,0.002819,-11.522861]);
+vertexPosition.push(...[3.723239,3.431065,-11.522861]);
+vertexPosition.push(...[3.723239,0.002819,-11.912518]);
+vertexPosition.push(...[3.723239,3.431065,-11.912518]);
+vertexPosition.push(...[4.129561,0.002819,-11.522861]);
+vertexPosition.push(...[4.129561,3.431065,-11.522861]);
+vertexPosition.push(...[4.129561,0.002819,-11.912518]);
+vertexPosition.push(...[4.129561,3.431065,-11.912518]);
+
+indexes.push(...[234,235,233]);
+indexes.push(...[236,239,235]);
+indexes.push(...[240,237,239]);
+indexes.push(...[238,233,237]);
+indexes.push(...[239,233,235]);
+indexes.push(...[236,238,240]);
+indexes.push(...[234,236,235]);
+indexes.push(...[236,240,239]);
+indexes.push(...[240,238,237]);
+indexes.push(...[238,234,233]);
+indexes.push(...[239,237,233]);
+indexes.push(...[236,234,238]);
+
+vertexPosition.push(...[5.302557,0.002819,-11.522861]);
+vertexPosition.push(...[5.302557,3.431065,-11.522861]);
+vertexPosition.push(...[5.302557,0.002819,-11.912518]);
+vertexPosition.push(...[5.302557,3.431065,-11.912518]);
+vertexPosition.push(...[5.708879,0.002819,-11.522861]);
+vertexPosition.push(...[5.708879,3.431065,-11.522861]);
+vertexPosition.push(...[5.708879,0.002819,-11.912518]);
+vertexPosition.push(...[5.708879,3.431065,-11.912518]);
+
+indexes.push(...[242,243,241]);
+indexes.push(...[244,247,243]);
+indexes.push(...[248,245,247]);
+indexes.push(...[246,241,245]);
+indexes.push(...[247,241,243]);
+indexes.push(...[244,246,248]);
+indexes.push(...[242,244,243]);
+indexes.push(...[244,248,247]);
+indexes.push(...[248,246,245]);
+indexes.push(...[246,242,241]);
+indexes.push(...[247,245,241]);
+indexes.push(...[244,242,246]);
+
+vertexPosition.push(...[3.958841,3.634437,-11.727621]);
+vertexPosition.push(...[3.958841,3.634437,-13.251452]);
+vertexPosition.push(...[5.508492,3.634437,-11.727621]);
+vertexPosition.push(...[5.508492,3.634437,-13.251452]);
+vertexPosition.push(...[3.713655,3.377897,-11.519915]);
+vertexPosition.push(...[3.713655,4.083660,-11.519915]);
+vertexPosition.push(...[3.713655,3.377897,-13.519915]);
+vertexPosition.push(...[3.713655,4.083660,-13.519915]);
+vertexPosition.push(...[5.713655,3.377897,-11.519915]);
+vertexPosition.push(...[5.713655,4.083660,-11.519915]);
+vertexPosition.push(...[5.713655,3.377897,-13.519915]);
+vertexPosition.push(...[5.713655,4.083660,-13.519915]);
+vertexPosition.push(...[3.958841,4.083660,-11.727621]);
+vertexPosition.push(...[3.958841,4.083660,-13.251452]);
+vertexPosition.push(...[5.508492,4.083660,-13.251452]);
+vertexPosition.push(...[5.508492,4.083660,-11.727621]);
+
+indexes.push(...[254,255,253]);
+indexes.push(...[256,259,255]);
+indexes.push(...[260,257,259]);
+indexes.push(...[258,253,257]);
+indexes.push(...[259,253,255]);
+indexes.push(...[249,262,261]);
+indexes.push(...[250,263,262]);
+indexes.push(...[251,263,252]);
+indexes.push(...[249,264,251]);
+indexes.push(...[249,252,250]);
+indexes.push(...[262,263,260]);
+indexes.push(...[261,258,264]);
+indexes.push(...[254,256,255]);
+indexes.push(...[256,260,259]);
+indexes.push(...[260,258,257]);
+indexes.push(...[258,254,253]);
+indexes.push(...[259,257,253]);
+indexes.push(...[249,250,262]);
+indexes.push(...[250,252,263]);
+indexes.push(...[251,264,263]);
+indexes.push(...[249,261,264]);
+indexes.push(...[249,251,252]);
+indexes.push(...[263,264,258]);
+indexes.push(...[256,254,262]);
+indexes.push(...[254,261,262]);
+indexes.push(...[263,258,260]);
+indexes.push(...[256,262,260]);
+indexes.push(...[261,254,258]);
+
+vertexPosition.push(...[-8.122201,3.634437,-11.727621]);
+vertexPosition.push(...[-8.122201,3.634437,-13.251452]);
+vertexPosition.push(...[-6.572551,3.634437,-11.727621]);
+vertexPosition.push(...[-6.572551,3.634437,-13.251452]);
+vertexPosition.push(...[-8.367387,3.377897,-11.519915]);
+vertexPosition.push(...[-8.367387,4.083660,-11.519915]);
+vertexPosition.push(...[-8.367387,3.377897,-13.519915]);
+vertexPosition.push(...[-8.367387,4.083660,-13.519915]);
+vertexPosition.push(...[-6.367387,3.377897,-11.519915]);
+vertexPosition.push(...[-6.367387,4.083660,-11.519915]);
+vertexPosition.push(...[-6.367387,3.377897,-13.519915]);
+vertexPosition.push(...[-6.367387,4.083660,-13.519915]);
+vertexPosition.push(...[-8.122201,4.083660,-11.727621]);
+vertexPosition.push(...[-8.122201,4.083660,-13.251452]);
+vertexPosition.push(...[-6.572551,4.083660,-13.251452]);
+vertexPosition.push(...[-6.572551,4.083660,-11.727621]);
+
+indexes.push(...[270,271,269]);
+indexes.push(...[272,275,271]);
+indexes.push(...[276,273,275]);
+indexes.push(...[274,269,273]);
+indexes.push(...[275,269,271]);
+indexes.push(...[265,278,277]);
+indexes.push(...[266,279,278]);
+indexes.push(...[267,279,268]);
+indexes.push(...[265,280,267]);
+indexes.push(...[265,268,266]);
+indexes.push(...[278,279,276]);
+indexes.push(...[277,274,280]);
+indexes.push(...[270,272,271]);
+indexes.push(...[272,276,275]);
+indexes.push(...[276,274,273]);
+indexes.push(...[274,270,269]);
+indexes.push(...[275,273,269]);
+indexes.push(...[265,266,278]);
+indexes.push(...[266,268,279]);
+indexes.push(...[267,280,279]);
+indexes.push(...[265,277,280]);
+indexes.push(...[265,267,268]);
+indexes.push(...[279,280,274]);
+indexes.push(...[272,270,278]);
+indexes.push(...[270,277,278]);
+indexes.push(...[279,274,276]);
+indexes.push(...[272,278,276]);
+indexes.push(...[277,270,274]);
+
+vertexPosition.push(...[-6.778485,0.002819,-11.522861]);
+vertexPosition.push(...[-6.778485,3.431065,-11.522861]);
+vertexPosition.push(...[-6.778485,0.002819,-11.912518]);
+vertexPosition.push(...[-6.778485,3.431065,-11.912518]);
+vertexPosition.push(...[-6.372163,0.002819,-11.522861]);
+vertexPosition.push(...[-6.372163,3.431065,-11.522861]);
+vertexPosition.push(...[-6.372163,0.002819,-11.912518]);
+vertexPosition.push(...[-6.372163,3.431065,-11.912518]);
+
+indexes.push(...[282,283,281]);
+indexes.push(...[284,287,283]);
+indexes.push(...[288,285,287]);
+indexes.push(...[286,281,285]);
+indexes.push(...[287,281,283]);
+indexes.push(...[284,286,288]);
+indexes.push(...[282,284,283]);
+indexes.push(...[284,288,287]);
+indexes.push(...[288,286,285]);
+indexes.push(...[286,282,281]);
+indexes.push(...[287,285,281]);
+indexes.push(...[284,282,286]);
+
+vertexPosition.push(...[-8.357803,0.002819,-11.522861]);
+vertexPosition.push(...[-8.357803,3.431065,-11.522861]);
+vertexPosition.push(...[-8.357803,0.002819,-11.912518]);
+vertexPosition.push(...[-8.357803,3.431065,-11.912518]);
+vertexPosition.push(...[-7.951481,0.002819,-11.522861]);
+vertexPosition.push(...[-7.951481,3.431065,-11.522861]);
+vertexPosition.push(...[-7.951481,0.002819,-11.912518]);
+vertexPosition.push(...[-7.951481,3.431065,-11.912518]);
+
+indexes.push(...[290,291,289]);
+indexes.push(...[292,295,291]);
+indexes.push(...[296,293,295]);
+indexes.push(...[294,289,293]);
+indexes.push(...[295,289,291]);
+indexes.push(...[292,294,296]);
+indexes.push(...[290,292,291]);
+indexes.push(...[292,296,295]);
+indexes.push(...[296,294,293]);
+indexes.push(...[294,290,289]);
+indexes.push(...[295,293,289]);
+indexes.push(...[292,290,294]);
+
+vertexPosition.push(...[-8.357803,0.002819,-13.121767]);
+vertexPosition.push(...[-8.357803,3.431065,-13.121767]);
+vertexPosition.push(...[-8.357803,0.002819,-13.511423]);
+vertexPosition.push(...[-8.357803,3.431065,-13.511423]);
+vertexPosition.push(...[-7.951481,0.002819,-13.121767]);
+vertexPosition.push(...[-7.951481,3.431065,-13.121767]);
+vertexPosition.push(...[-7.951481,0.002819,-13.511423]);
+vertexPosition.push(...[-7.951481,3.431065,-13.511423]);
+
+indexes.push(...[298,299,297]);
+indexes.push(...[300,303,299]);
+indexes.push(...[304,301,303]);
+indexes.push(...[302,297,301]);
+indexes.push(...[303,297,299]);
+indexes.push(...[300,302,304]);
+indexes.push(...[298,300,299]);
+indexes.push(...[300,304,303]);
+indexes.push(...[304,302,301]);
+indexes.push(...[302,298,297]);
+indexes.push(...[303,301,297]);
+indexes.push(...[300,298,302]);
+
+vertexPosition.push(...[-6.797334,0.002819,-13.121767]);
+vertexPosition.push(...[-6.797334,3.431065,-13.121767]);
+vertexPosition.push(...[-6.797334,0.002819,-13.511423]);
+vertexPosition.push(...[-6.797334,3.431065,-13.511423]);
+vertexPosition.push(...[-6.391011,0.002819,-13.121767]);
+vertexPosition.push(...[-6.391011,3.431065,-13.121767]);
+vertexPosition.push(...[-6.391011,0.002819,-13.511423]);
+vertexPosition.push(...[-6.391011,3.431065,-13.511423]);
+
+indexes.push(...[306,307,305]);
+indexes.push(...[308,311,307]);
+indexes.push(...[312,309,311]);
+indexes.push(...[310,305,309]);
+indexes.push(...[311,305,307]);
+indexes.push(...[308,310,312]);
+indexes.push(...[306,308,307]);
+indexes.push(...[308,312,311]);
+indexes.push(...[312,310,309]);
+indexes.push(...[310,306,305]);
+indexes.push(...[311,309,305]);
+indexes.push(...[308,306,310]);
+
+vertexPosition.push(...[-6.587630,4.086362,-13.308477]);
+vertexPosition.push(...[-6.587630,5.459464,-13.308477]);
+vertexPosition.push(...[-6.587630,4.086362,-13.468334]);
+vertexPosition.push(...[-6.587630,5.459464,-13.468334]);
+vertexPosition.push(...[-6.421939,4.086362,-13.308477]);
+vertexPosition.push(...[-6.421939,5.459464,-13.308477]);
+vertexPosition.push(...[-6.421939,4.086362,-13.468334]);
+vertexPosition.push(...[-6.421939,5.459464,-13.468334]);
+
+indexes.push(...[314,315,313]);
+indexes.push(...[316,319,315]);
+indexes.push(...[320,317,319]);
+indexes.push(...[318,313,317]);
+indexes.push(...[319,313,315]);
+indexes.push(...[316,318,320]);
+indexes.push(...[314,316,315]);
+indexes.push(...[316,320,319]);
+indexes.push(...[320,318,317]);
+indexes.push(...[318,314,313]);
+indexes.push(...[319,317,313]);
+indexes.push(...[316,314,318]);
+
+vertexPosition.push(...[-8.328621,4.086362,-13.308477]);
+vertexPosition.push(...[-8.328621,5.459464,-13.308477]);
+vertexPosition.push(...[-8.328621,4.086362,-13.468334]);
+vertexPosition.push(...[-8.328621,5.459464,-13.468334]);
+vertexPosition.push(...[-8.162931,4.086362,-13.308477]);
+vertexPosition.push(...[-8.162931,5.459464,-13.308477]);
+vertexPosition.push(...[-8.162931,4.086362,-13.468334]);
+vertexPosition.push(...[-8.162931,5.459464,-13.468334]);
+
+indexes.push(...[322,323,321]);
+indexes.push(...[324,327,323]);
+indexes.push(...[328,325,327]);
+indexes.push(...[326,321,325]);
+indexes.push(...[327,321,323]);
+indexes.push(...[324,326,328]);
+indexes.push(...[322,324,323]);
+indexes.push(...[324,328,327]);
+indexes.push(...[328,326,325]);
+indexes.push(...[326,322,321]);
+indexes.push(...[327,325,321]);
+indexes.push(...[324,322,326]);
+
+vertexPosition.push(...[-8.328621,4.086362,-11.597991]);
+vertexPosition.push(...[-8.328621,5.459464,-11.597991]);
+vertexPosition.push(...[-8.328621,4.086362,-11.757848]);
+vertexPosition.push(...[-8.328621,5.459464,-11.757848]);
+vertexPosition.push(...[-8.162931,4.086362,-11.597991]);
+vertexPosition.push(...[-8.162931,5.459464,-11.597991]);
+vertexPosition.push(...[-8.162931,4.086362,-11.757848]);
+vertexPosition.push(...[-8.162931,5.459464,-11.757848]);
+
+indexes.push(...[330,331,329]);
+indexes.push(...[332,335,331]);
+indexes.push(...[336,333,335]);
+indexes.push(...[334,329,333]);
+indexes.push(...[335,329,331]);
+indexes.push(...[332,334,336]);
+indexes.push(...[330,332,331]);
+indexes.push(...[332,336,335]);
+indexes.push(...[336,334,333]);
+indexes.push(...[334,330,329]);
+indexes.push(...[335,333,329]);
+indexes.push(...[332,330,334]);
+
+vertexPosition.push(...[-6.567227,4.086362,-11.597991]);
+vertexPosition.push(...[-6.567227,5.459464,-11.597991]);
+vertexPosition.push(...[-6.567227,4.086362,-11.757848]);
+vertexPosition.push(...[-6.567227,5.459464,-11.757848]);
+vertexPosition.push(...[-6.401536,4.086362,-11.597991]);
+vertexPosition.push(...[-6.401536,5.459464,-11.597991]);
+vertexPosition.push(...[-6.401536,4.086362,-11.757848]);
+vertexPosition.push(...[-6.401536,5.459464,-11.757848]);
+
+indexes.push(...[338,339,337]);
+indexes.push(...[340,343,339]);
+indexes.push(...[344,341,343]);
+indexes.push(...[342,337,341]);
+indexes.push(...[343,337,339]);
+indexes.push(...[340,342,344]);
+indexes.push(...[338,340,339]);
+indexes.push(...[340,344,343]);
+indexes.push(...[344,342,341]);
+indexes.push(...[342,338,337]);
+indexes.push(...[343,341,337]);
+indexes.push(...[340,338,342]);
+
+vertexPosition.push(...[-8.361237,5.452830,-11.493440]);
+vertexPosition.push(...[-7.371781,5.872699,-12.482895]);
+vertexPosition.push(...[-8.361237,5.452830,-13.493440]);
+vertexPosition.push(...[-7.371781,5.872699,-12.503984]);
+vertexPosition.push(...[-6.361237,5.452830,-11.493440]);
+vertexPosition.push(...[-7.350692,5.872699,-12.482895]);
+vertexPosition.push(...[-6.361237,5.452830,-13.493440]);
+vertexPosition.push(...[-7.350692,5.872699,-12.503984]);
+
+indexes.push(...[345,348,347]);
+indexes.push(...[347,352,351]);
+indexes.push(...[351,350,349]);
+indexes.push(...[349,346,345]);
+indexes.push(...[351,345,347]);
+indexes.push(...[348,350,352]);
+indexes.push(...[345,346,348]);
+indexes.push(...[347,348,352]);
+indexes.push(...[351,352,350]);
+indexes.push(...[349,350,346]);
+indexes.push(...[351,349,345]);
+indexes.push(...[348,346,350]);
+
+vertexPosition.push(...[-1.493660,1.758637,-5.753691]);
+vertexPosition.push(...[-0.151399,1.758637,-5.753691]);
+vertexPosition.push(...[-2.494062,0.059529,-5.587970]);
+vertexPosition.push(...[-2.494062,2.776765,-5.587970]);
+vertexPosition.push(...[-2.494062,0.059529,-7.988175]);
+vertexPosition.push(...[-2.494062,2.776765,-7.988175]);
+vertexPosition.push(...[0.794252,0.059529,-5.587970]);
+vertexPosition.push(...[0.794252,2.776765,-5.587970]);
+vertexPosition.push(...[0.794252,0.059529,-7.988175]);
+vertexPosition.push(...[0.794252,2.776765,-7.988175]);
+vertexPosition.push(...[-1.493660,0.059529,-5.587970]);
+vertexPosition.push(...[-1.493660,0.059529,-5.753691]);
+vertexPosition.push(...[-1.493660,1.758637,-5.587970]);
+vertexPosition.push(...[-0.151399,0.059529,-5.753691]);
+vertexPosition.push(...[-0.151399,0.059529,-5.587970]);
+vertexPosition.push(...[-0.151399,1.758637,-5.587970]);
+
+indexes.push(...[356,357,355]);
+indexes.push(...[358,361,357]);
+indexes.push(...[362,359,361]);
+indexes.push(...[358,360,362]);
+indexes.push(...[353,363,364]);
+indexes.push(...[354,364,366]);
+indexes.push(...[354,367,368]);
+indexes.push(...[353,368,365]);
+indexes.push(...[365,368,360]);
+indexes.push(...[361,366,364]);
+indexes.push(...[356,358,357]);
+indexes.push(...[358,362,361]);
+indexes.push(...[362,360,359]);
+indexes.push(...[358,356,360]);
+indexes.push(...[353,365,363]);
+indexes.push(...[354,353,364]);
+indexes.push(...[354,366,367]);
+indexes.push(...[353,354,368]);
+indexes.push(...[368,367,359]);
+indexes.push(...[356,355,365]);
+indexes.push(...[355,363,365]);
+indexes.push(...[368,359,360]);
+indexes.push(...[356,365,360]);
+indexes.push(...[363,355,364]);
+indexes.push(...[355,357,364]);
+indexes.push(...[357,361,364]);
+indexes.push(...[361,359,366]);
+indexes.push(...[359,367,366]);
+
+vertexPosition.push(...[-2.585731,0.012204,-7.962643]);
+vertexPosition.push(...[-2.585731,2.766564,-7.962643]);
+vertexPosition.push(...[-2.340614,0.012204,-7.939934]);
+vertexPosition.push(...[-2.340614,2.766564,-7.939934]);
+vertexPosition.push(...[-2.104917,0.012204,-7.872680]);
+vertexPosition.push(...[-2.104917,2.766564,-7.872680]);
+vertexPosition.push(...[-1.887697,0.012204,-7.763465]);
+vertexPosition.push(...[-1.887697,2.766564,-7.763465]);
+vertexPosition.push(...[-1.697302,0.012204,-7.616486]);
+vertexPosition.push(...[-1.697302,2.766564,-7.616486]);
+vertexPosition.push(...[-1.541049,0.012204,-7.437392]);
+vertexPosition.push(...[-1.541049,2.766564,-7.437392]);
+vertexPosition.push(...[-1.424943,0.012204,-7.233065]);
+vertexPosition.push(...[-1.424943,2.766564,-7.233065]);
+vertexPosition.push(...[-1.353445,0.012204,-7.011357]);
+vertexPosition.push(...[-1.353445,2.766564,-7.011357]);
+vertexPosition.push(...[-1.329303,0.012204,-6.780788]);
+vertexPosition.push(...[-1.329303,2.766564,-6.780788]);
+vertexPosition.push(...[-1.353445,0.012204,-6.550220]);
+vertexPosition.push(...[-1.353445,2.766564,-6.550220]);
+vertexPosition.push(...[-1.424943,0.012204,-6.328512]);
+vertexPosition.push(...[-1.424943,2.766564,-6.328512]);
+vertexPosition.push(...[-1.541049,0.012204,-6.124185]);
+vertexPosition.push(...[-1.541049,2.766564,-6.124185]);
+vertexPosition.push(...[-1.697302,0.012204,-5.945091]);
+vertexPosition.push(...[-1.697302,2.766564,-5.945091]);
+vertexPosition.push(...[-1.887697,0.012204,-5.798112]);
+vertexPosition.push(...[-1.887697,2.766564,-5.798112]);
+vertexPosition.push(...[-2.104917,0.012204,-5.688897]);
+vertexPosition.push(...[-2.104917,2.766564,-5.688897]);
+vertexPosition.push(...[-2.340614,0.012204,-5.621643]);
+vertexPosition.push(...[-2.340614,2.766564,-5.621643]);
+vertexPosition.push(...[-2.585732,0.012204,-5.598934]);
+vertexPosition.push(...[-2.585732,2.766564,-5.598934]);
+vertexPosition.push(...[-2.830848,0.012204,-5.621643]);
+vertexPosition.push(...[-2.830848,2.766564,-5.621643]);
+vertexPosition.push(...[-3.066546,0.012204,-5.688897]);
+vertexPosition.push(...[-3.066546,2.766564,-5.688897]);
+vertexPosition.push(...[-3.283766,0.012204,-5.798112]);
+vertexPosition.push(...[-3.283766,2.766564,-5.798112]);
+vertexPosition.push(...[-3.474160,0.012204,-5.945091]);
+vertexPosition.push(...[-3.474160,2.766564,-5.945091]);
+vertexPosition.push(...[-3.630413,0.012204,-6.124186]);
+vertexPosition.push(...[-3.630413,2.766564,-6.124186]);
+vertexPosition.push(...[-3.746520,0.012204,-6.328513]);
+vertexPosition.push(...[-3.746520,2.766564,-6.328513]);
+vertexPosition.push(...[-3.818017,0.012204,-6.550221]);
+vertexPosition.push(...[-3.818017,2.766564,-6.550221]);
+vertexPosition.push(...[-3.842159,0.012204,-6.780789]);
+vertexPosition.push(...[-3.842159,2.766564,-6.780789]);
+vertexPosition.push(...[-3.818017,0.012204,-7.011358]);
+vertexPosition.push(...[-3.818017,2.766564,-7.011358]);
+vertexPosition.push(...[-3.746519,0.012204,-7.233066]);
+vertexPosition.push(...[-3.746519,2.766564,-7.233066]);
+vertexPosition.push(...[-3.630412,0.012204,-7.437393]);
+vertexPosition.push(...[-3.630412,2.766564,-7.437393]);
+vertexPosition.push(...[-3.474159,0.012204,-7.616487]);
+vertexPosition.push(...[-3.474159,2.766564,-7.616487]);
+vertexPosition.push(...[-3.283763,0.012204,-7.763465]);
+vertexPosition.push(...[-3.283763,2.766564,-7.763465]);
+vertexPosition.push(...[-3.066544,0.012204,-7.872681]);
+vertexPosition.push(...[-3.066544,2.766564,-7.872681]);
+vertexPosition.push(...[-2.830846,0.012204,-7.939935]);
+vertexPosition.push(...[-2.830846,2.766564,-7.939935]);
+
+indexes.push(...[370,371,369]);
+indexes.push(...[372,373,371]);
+indexes.push(...[374,375,373]);
+indexes.push(...[376,377,375]);
+indexes.push(...[378,379,377]);
+indexes.push(...[380,381,379]);
+indexes.push(...[382,383,381]);
+indexes.push(...[384,385,383]);
+indexes.push(...[386,387,385]);
+indexes.push(...[388,389,387]);
+indexes.push(...[390,391,389]);
+indexes.push(...[392,393,391]);
+indexes.push(...[394,395,393]);
+indexes.push(...[396,397,395]);
+indexes.push(...[398,399,397]);
+indexes.push(...[400,401,399]);
+indexes.push(...[402,403,401]);
+indexes.push(...[404,405,403]);
+indexes.push(...[406,407,405]);
+indexes.push(...[408,409,407]);
+indexes.push(...[410,411,409]);
+indexes.push(...[412,413,411]);
+indexes.push(...[414,415,413]);
+indexes.push(...[416,417,415]);
+indexes.push(...[418,419,417]);
+indexes.push(...[420,421,419]);
+indexes.push(...[422,423,421]);
+indexes.push(...[424,425,423]);
+indexes.push(...[426,427,425]);
+indexes.push(...[428,429,427]);
+indexes.push(...[422,406,390]);
+indexes.push(...[430,431,429]);
+indexes.push(...[432,369,431]);
+indexes.push(...[383,399,415]);
+indexes.push(...[370,372,371]);
+indexes.push(...[372,374,373]);
+indexes.push(...[374,376,375]);
+indexes.push(...[376,378,377]);
+indexes.push(...[378,380,379]);
+indexes.push(...[380,382,381]);
+indexes.push(...[382,384,383]);
+indexes.push(...[384,386,385]);
+indexes.push(...[386,388,387]);
+indexes.push(...[388,390,389]);
+indexes.push(...[390,392,391]);
+indexes.push(...[392,394,393]);
+indexes.push(...[394,396,395]);
+indexes.push(...[396,398,397]);
+indexes.push(...[398,400,399]);
+indexes.push(...[400,402,401]);
+indexes.push(...[402,404,403]);
+indexes.push(...[404,406,405]);
+indexes.push(...[406,408,407]);
+indexes.push(...[408,410,409]);
+indexes.push(...[410,412,411]);
+indexes.push(...[412,414,413]);
+indexes.push(...[414,416,415]);
+indexes.push(...[416,418,417]);
+indexes.push(...[418,420,419]);
+indexes.push(...[420,422,421]);
+indexes.push(...[422,424,423]);
+indexes.push(...[424,426,425]);
+indexes.push(...[426,428,427]);
+indexes.push(...[428,430,429]);
+indexes.push(...[374,372,370]);
+indexes.push(...[370,432,374]);
+indexes.push(...[432,430,374]);
+indexes.push(...[430,428,426]);
+indexes.push(...[426,424,422]);
+indexes.push(...[422,420,418]);
+indexes.push(...[418,416,422]);
+indexes.push(...[416,414,422]);
+indexes.push(...[414,412,406]);
+indexes.push(...[412,410,406]);
+indexes.push(...[410,408,406]);
+indexes.push(...[406,404,402]);
+indexes.push(...[402,400,398]);
+indexes.push(...[398,396,394]);
+indexes.push(...[394,392,390]);
+indexes.push(...[390,388,386]);
+indexes.push(...[386,384,390]);
+indexes.push(...[384,382,390]);
+indexes.push(...[382,380,378]);
+indexes.push(...[378,376,374]);
+indexes.push(...[430,426,374]);
+indexes.push(...[426,422,374]);
+indexes.push(...[406,402,390]);
+indexes.push(...[402,398,390]);
+indexes.push(...[398,394,390]);
+indexes.push(...[382,378,390]);
+indexes.push(...[378,374,390]);
+indexes.push(...[422,414,406]);
+indexes.push(...[374,422,390]);
+indexes.push(...[430,432,431]);
+indexes.push(...[432,370,369]);
+indexes.push(...[431,369,371]);
+indexes.push(...[371,373,375]);
+indexes.push(...[375,377,379]);
+indexes.push(...[379,381,375]);
+indexes.push(...[381,383,375]);
+indexes.push(...[383,385,387]);
+indexes.push(...[387,389,383]);
+indexes.push(...[389,391,383]);
+indexes.push(...[391,393,399]);
+indexes.push(...[393,395,399]);
+indexes.push(...[395,397,399]);
+indexes.push(...[399,401,403]);
+indexes.push(...[403,405,407]);
+indexes.push(...[407,409,411]);
+indexes.push(...[411,413,415]);
+indexes.push(...[415,417,419]);
+indexes.push(...[419,421,423]);
+indexes.push(...[423,425,431]);
+indexes.push(...[425,427,431]);
+indexes.push(...[427,429,431]);
+indexes.push(...[431,371,375]);
+indexes.push(...[399,403,415]);
+indexes.push(...[403,407,415]);
+indexes.push(...[407,411,415]);
+indexes.push(...[415,419,431]);
+indexes.push(...[419,423,431]);
+indexes.push(...[431,375,383]);
+indexes.push(...[383,391,399]);
+indexes.push(...[431,383,415]);
+
+vertexPosition.push(...[0.916087,0.012204,-7.962643]);
+vertexPosition.push(...[0.916087,2.766564,-7.962643]);
+vertexPosition.push(...[1.161204,0.012204,-7.939934]);
+vertexPosition.push(...[1.161204,2.766564,-7.939934]);
+vertexPosition.push(...[1.396901,0.012204,-7.872680]);
+vertexPosition.push(...[1.396901,2.766564,-7.872680]);
+vertexPosition.push(...[1.614121,0.012204,-7.763465]);
+vertexPosition.push(...[1.614121,2.766564,-7.763465]);
+vertexPosition.push(...[1.804515,0.012204,-7.616486]);
+vertexPosition.push(...[1.804515,2.766564,-7.616486]);
+vertexPosition.push(...[1.960768,0.012204,-7.437392]);
+vertexPosition.push(...[1.960768,2.766564,-7.437392]);
+vertexPosition.push(...[2.076875,0.012204,-7.233065]);
+vertexPosition.push(...[2.076875,2.766564,-7.233065]);
+vertexPosition.push(...[2.148373,0.012204,-7.011357]);
+vertexPosition.push(...[2.148373,2.766564,-7.011357]);
+vertexPosition.push(...[2.172515,0.012204,-6.780788]);
+vertexPosition.push(...[2.172515,2.766564,-6.780788]);
+vertexPosition.push(...[2.148373,0.012204,-6.550220]);
+vertexPosition.push(...[2.148373,2.766564,-6.550220]);
+vertexPosition.push(...[2.076875,0.012204,-6.328512]);
+vertexPosition.push(...[2.076875,2.766564,-6.328512]);
+vertexPosition.push(...[1.960768,0.012204,-6.124185]);
+vertexPosition.push(...[1.960768,2.766564,-6.124185]);
+vertexPosition.push(...[1.804515,0.012204,-5.945091]);
+vertexPosition.push(...[1.804515,2.766564,-5.945091]);
+vertexPosition.push(...[1.614121,0.012204,-5.798112]);
+vertexPosition.push(...[1.614121,2.766564,-5.798112]);
+vertexPosition.push(...[1.396901,0.012204,-5.688897]);
+vertexPosition.push(...[1.396901,2.766564,-5.688897]);
+vertexPosition.push(...[1.161203,0.012204,-5.621643]);
+vertexPosition.push(...[1.161203,2.766564,-5.621643]);
+vertexPosition.push(...[0.916086,0.012204,-5.598934]);
+vertexPosition.push(...[0.916086,2.766564,-5.598934]);
+vertexPosition.push(...[0.670969,0.012204,-5.621643]);
+vertexPosition.push(...[0.670969,2.766564,-5.621643]);
+vertexPosition.push(...[0.435272,0.012204,-5.688897]);
+vertexPosition.push(...[0.435272,2.766564,-5.688897]);
+vertexPosition.push(...[0.218052,0.012204,-5.798112]);
+vertexPosition.push(...[0.218052,2.766564,-5.798112]);
+vertexPosition.push(...[0.027658,0.012204,-5.945091]);
+vertexPosition.push(...[0.027658,2.766564,-5.945091]);
+vertexPosition.push(...[-0.128595,0.012204,-6.124186]);
+vertexPosition.push(...[-0.128595,2.766564,-6.124186]);
+vertexPosition.push(...[-0.244702,0.012204,-6.328513]);
+vertexPosition.push(...[-0.244702,2.766564,-6.328513]);
+vertexPosition.push(...[-0.316199,0.012204,-6.550221]);
+vertexPosition.push(...[-0.316199,2.766564,-6.550221]);
+vertexPosition.push(...[-0.340341,0.012204,-6.780789]);
+vertexPosition.push(...[-0.340341,2.766564,-6.780789]);
+vertexPosition.push(...[-0.316199,0.012204,-7.011358]);
+vertexPosition.push(...[-0.316199,2.766564,-7.011358]);
+vertexPosition.push(...[-0.244701,0.012204,-7.233066]);
+vertexPosition.push(...[-0.244701,2.766564,-7.233066]);
+vertexPosition.push(...[-0.128594,0.012204,-7.437393]);
+vertexPosition.push(...[-0.128594,2.766564,-7.437393]);
+vertexPosition.push(...[0.027659,0.012204,-7.616487]);
+vertexPosition.push(...[0.027659,2.766564,-7.616487]);
+vertexPosition.push(...[0.218054,0.012204,-7.763465]);
+vertexPosition.push(...[0.218054,2.766564,-7.763465]);
+vertexPosition.push(...[0.435274,0.012204,-7.872681]);
+vertexPosition.push(...[0.435274,2.766564,-7.872681]);
+vertexPosition.push(...[0.670972,0.012204,-7.939935]);
+vertexPosition.push(...[0.670972,2.766564,-7.939935]);
+
+indexes.push(...[434,435,433]);
+indexes.push(...[436,437,435]);
+indexes.push(...[438,439,437]);
+indexes.push(...[440,441,439]);
+indexes.push(...[442,443,441]);
+indexes.push(...[444,445,443]);
+indexes.push(...[446,447,445]);
+indexes.push(...[448,449,447]);
+indexes.push(...[450,451,449]);
+indexes.push(...[452,453,451]);
+indexes.push(...[454,455,453]);
+indexes.push(...[456,457,455]);
+indexes.push(...[458,459,457]);
+indexes.push(...[460,461,459]);
+indexes.push(...[462,463,461]);
+indexes.push(...[464,465,463]);
+indexes.push(...[466,467,465]);
+indexes.push(...[468,469,467]);
+indexes.push(...[470,471,469]);
+indexes.push(...[472,473,471]);
+indexes.push(...[474,475,473]);
+indexes.push(...[476,477,475]);
+indexes.push(...[478,479,477]);
+indexes.push(...[480,481,479]);
+indexes.push(...[482,483,481]);
+indexes.push(...[484,485,483]);
+indexes.push(...[486,487,485]);
+indexes.push(...[488,489,487]);
+indexes.push(...[490,491,489]);
+indexes.push(...[492,493,491]);
+indexes.push(...[486,470,454]);
+indexes.push(...[494,495,493]);
+indexes.push(...[496,433,495]);
+indexes.push(...[447,463,479]);
+indexes.push(...[434,436,435]);
+indexes.push(...[436,438,437]);
+indexes.push(...[438,440,439]);
+indexes.push(...[440,442,441]);
+indexes.push(...[442,444,443]);
+indexes.push(...[444,446,445]);
+indexes.push(...[446,448,447]);
+indexes.push(...[448,450,449]);
+indexes.push(...[450,452,451]);
+indexes.push(...[452,454,453]);
+indexes.push(...[454,456,455]);
+indexes.push(...[456,458,457]);
+indexes.push(...[458,460,459]);
+indexes.push(...[460,462,461]);
+indexes.push(...[462,464,463]);
+indexes.push(...[464,466,465]);
+indexes.push(...[466,468,467]);
+indexes.push(...[468,470,469]);
+indexes.push(...[470,472,471]);
+indexes.push(...[472,474,473]);
+indexes.push(...[474,476,475]);
+indexes.push(...[476,478,477]);
+indexes.push(...[478,480,479]);
+indexes.push(...[480,482,481]);
+indexes.push(...[482,484,483]);
+indexes.push(...[484,486,485]);
+indexes.push(...[486,488,487]);
+indexes.push(...[488,490,489]);
+indexes.push(...[490,492,491]);
+indexes.push(...[492,494,493]);
+indexes.push(...[438,436,434]);
+indexes.push(...[434,496,438]);
+indexes.push(...[496,494,438]);
+indexes.push(...[494,492,490]);
+indexes.push(...[490,488,486]);
+indexes.push(...[486,484,482]);
+indexes.push(...[482,480,486]);
+indexes.push(...[480,478,486]);
+indexes.push(...[478,476,470]);
+indexes.push(...[476,474,470]);
+indexes.push(...[474,472,470]);
+indexes.push(...[470,468,466]);
+indexes.push(...[466,464,462]);
+indexes.push(...[462,460,458]);
+indexes.push(...[458,456,454]);
+indexes.push(...[454,452,450]);
+indexes.push(...[450,448,454]);
+indexes.push(...[448,446,454]);
+indexes.push(...[446,444,442]);
+indexes.push(...[442,440,438]);
+indexes.push(...[494,490,438]);
+indexes.push(...[490,486,438]);
+indexes.push(...[470,466,454]);
+indexes.push(...[466,462,454]);
+indexes.push(...[462,458,454]);
+indexes.push(...[446,442,454]);
+indexes.push(...[442,438,454]);
+indexes.push(...[486,478,470]);
+indexes.push(...[438,486,454]);
+indexes.push(...[494,496,495]);
+indexes.push(...[496,434,433]);
+indexes.push(...[495,433,435]);
+indexes.push(...[435,437,439]);
+indexes.push(...[439,441,443]);
+indexes.push(...[443,445,439]);
+indexes.push(...[445,447,439]);
+indexes.push(...[447,449,451]);
+indexes.push(...[451,453,447]);
+indexes.push(...[453,455,447]);
+indexes.push(...[455,457,463]);
+indexes.push(...[457,459,463]);
+indexes.push(...[459,461,463]);
+indexes.push(...[463,465,467]);
+indexes.push(...[467,469,471]);
+indexes.push(...[471,473,475]);
+indexes.push(...[475,477,479]);
+indexes.push(...[479,481,483]);
+indexes.push(...[483,485,487]);
+indexes.push(...[487,489,495]);
+indexes.push(...[489,491,495]);
+indexes.push(...[491,493,495]);
+indexes.push(...[495,435,439]);
+indexes.push(...[463,467,479]);
+indexes.push(...[467,471,479]);
+indexes.push(...[471,475,479]);
+indexes.push(...[479,483,495]);
+indexes.push(...[483,487,495]);
+indexes.push(...[495,439,447]);
+indexes.push(...[447,455,463]);
+indexes.push(...[495,447,479]);
+
+vertexPosition.push(...[-2.633377,2.757857,-5.810165]);
+vertexPosition.push(...[-2.633377,3.191043,-5.810165]);
+vertexPosition.push(...[-2.633377,2.757857,-5.579796]);
+vertexPosition.push(...[-2.633377,3.191043,-5.579796]);
+vertexPosition.push(...[-2.084612,2.757857,-5.810165]);
+vertexPosition.push(...[-2.084612,3.191043,-5.810165]);
+vertexPosition.push(...[-2.084612,2.757857,-5.579796]);
+vertexPosition.push(...[-2.084612,3.191043,-5.579796]);
+
+indexes.push(...[498,497,499]);
+indexes.push(...[500,499,503]);
+indexes.push(...[504,503,501]);
+indexes.push(...[502,501,497]);
+indexes.push(...[503,499,497]);
+indexes.push(...[500,504,502]);
+indexes.push(...[498,499,500]);
+indexes.push(...[500,503,504]);
+indexes.push(...[504,501,502]);
+indexes.push(...[502,497,498]);
+indexes.push(...[503,497,501]);
+indexes.push(...[500,502,498]);
+
+vertexPosition.push(...[-1.826654,2.757857,-5.810165]);
+vertexPosition.push(...[-1.826654,3.191043,-5.810165]);
+vertexPosition.push(...[-1.826654,2.757857,-5.579796]);
+vertexPosition.push(...[-1.826654,3.191043,-5.579796]);
+vertexPosition.push(...[-1.277889,2.757857,-5.810165]);
+vertexPosition.push(...[-1.277889,3.191043,-5.810165]);
+vertexPosition.push(...[-1.277889,2.757857,-5.579796]);
+vertexPosition.push(...[-1.277889,3.191043,-5.579796]);
+
+indexes.push(...[506,505,507]);
+indexes.push(...[508,507,511]);
+indexes.push(...[512,511,509]);
+indexes.push(...[510,509,505]);
+indexes.push(...[511,507,505]);
+indexes.push(...[508,512,510]);
+indexes.push(...[506,507,508]);
+indexes.push(...[508,511,512]);
+indexes.push(...[512,509,510]);
+indexes.push(...[510,505,506]);
+indexes.push(...[511,505,509]);
+indexes.push(...[508,510,506]);
+
+vertexPosition.push(...[-0.249699,2.757857,-5.810165]);
+vertexPosition.push(...[-0.249699,3.191043,-5.810165]);
+vertexPosition.push(...[-0.249699,2.757857,-5.579796]);
+vertexPosition.push(...[-0.249699,3.191043,-5.579796]);
+vertexPosition.push(...[0.299066,2.757857,-5.810165]);
+vertexPosition.push(...[0.299066,3.191043,-5.810165]);
+vertexPosition.push(...[0.299066,2.757857,-5.579796]);
+vertexPosition.push(...[0.299066,3.191043,-5.579796]);
+
+indexes.push(...[514,513,515]);
+indexes.push(...[516,515,519]);
+indexes.push(...[520,519,517]);
+indexes.push(...[518,517,513]);
+indexes.push(...[519,515,513]);
+indexes.push(...[516,520,518]);
+indexes.push(...[514,515,516]);
+indexes.push(...[516,519,520]);
+indexes.push(...[520,517,518]);
+indexes.push(...[518,513,514]);
+indexes.push(...[519,513,517]);
+indexes.push(...[516,518,514]);
+
+vertexPosition.push(...[0.524066,2.757857,-5.810165]);
+vertexPosition.push(...[0.524066,3.191043,-5.810165]);
+vertexPosition.push(...[0.524066,2.757857,-5.579796]);
+vertexPosition.push(...[0.524066,3.191043,-5.579796]);
+vertexPosition.push(...[1.072831,2.757857,-5.810165]);
+vertexPosition.push(...[1.072831,3.191043,-5.810165]);
+vertexPosition.push(...[1.072831,2.757857,-5.579796]);
+vertexPosition.push(...[1.072831,3.191043,-5.579796]);
+
+indexes.push(...[522,521,523]);
+indexes.push(...[524,523,527]);
+indexes.push(...[528,527,525]);
+indexes.push(...[526,525,521]);
+indexes.push(...[527,523,521]);
+indexes.push(...[524,528,526]);
+indexes.push(...[522,523,524]);
+indexes.push(...[524,527,528]);
+indexes.push(...[528,525,526]);
+indexes.push(...[526,521,522]);
+indexes.push(...[527,521,525]);
+indexes.push(...[524,526,522]);
+
+vertexPosition.push(...[-0.996235,2.757857,-5.810165]);
+vertexPosition.push(...[-0.996235,3.191043,-5.810165]);
+vertexPosition.push(...[-0.996235,2.757857,-5.579796]);
+vertexPosition.push(...[-0.996235,3.191043,-5.579796]);
+vertexPosition.push(...[-0.447471,2.757857,-5.810165]);
+vertexPosition.push(...[-0.447471,3.191043,-5.810165]);
+vertexPosition.push(...[-0.447471,2.757857,-5.579796]);
+vertexPosition.push(...[-0.447471,3.191043,-5.579796]);
+
+indexes.push(...[530,529,531]);
+indexes.push(...[532,531,535]);
+indexes.push(...[536,535,533]);
+indexes.push(...[534,533,529]);
+indexes.push(...[535,531,529]);
+indexes.push(...[532,536,534]);
+indexes.push(...[530,531,532]);
+indexes.push(...[532,535,536]);
+indexes.push(...[536,533,534]);
+indexes.push(...[534,529,530]);
+indexes.push(...[535,529,533]);
+indexes.push(...[532,534,530]);
+
+vertexPosition.push(...[-3.421946,2.757857,-6.122132]);
+vertexPosition.push(...[-3.421946,3.191043,-6.122132]);
+vertexPosition.push(...[-3.517357,2.757857,-5.912450]);
+vertexPosition.push(...[-3.517357,3.191043,-5.912450]);
+vertexPosition.push(...[-2.922460,2.757857,-5.894852]);
+vertexPosition.push(...[-2.922460,3.191043,-5.894852]);
+vertexPosition.push(...[-3.017871,2.757857,-5.685170]);
+vertexPosition.push(...[-3.017871,3.191043,-5.685170]);
+
+indexes.push(...[538,537,539]);
+indexes.push(...[540,539,543]);
+indexes.push(...[544,543,541]);
+indexes.push(...[542,541,537]);
+indexes.push(...[543,539,537]);
+indexes.push(...[540,544,542]);
+indexes.push(...[538,539,540]);
+indexes.push(...[540,543,544]);
+indexes.push(...[544,541,542]);
+indexes.push(...[542,537,538]);
+indexes.push(...[543,537,541]);
+indexes.push(...[540,542,538]);
+
+vertexPosition.push(...[-3.601337,2.757857,-7.044940]);
+vertexPosition.push(...[-3.601337,3.191043,-7.044940]);
+vertexPosition.push(...[-3.831296,2.757857,-7.031192]);
+vertexPosition.push(...[-3.831296,3.191043,-7.031192]);
+vertexPosition.push(...[-3.568588,2.757857,-6.497153]);
+vertexPosition.push(...[-3.568588,3.191043,-6.497153]);
+vertexPosition.push(...[-3.798547,2.757857,-6.483405]);
+vertexPosition.push(...[-3.798547,3.191043,-6.483405]);
+
+indexes.push(...[546,545,547]);
+indexes.push(...[548,547,551]);
+indexes.push(...[552,551,549]);
+indexes.push(...[550,549,545]);
+indexes.push(...[551,547,545]);
+indexes.push(...[548,552,550]);
+indexes.push(...[546,547,548]);
+indexes.push(...[548,551,552]);
+indexes.push(...[552,549,550]);
+indexes.push(...[550,545,546]);
+indexes.push(...[551,545,549]);
+indexes.push(...[548,550,546]);
+
+vertexPosition.push(...[-3.476931,2.757857,-7.585258]);
+vertexPosition.push(...[-3.476931,3.191043,-7.585258]);
+vertexPosition.push(...[-3.352319,2.757857,-7.391502]);
+vertexPosition.push(...[-3.352319,3.191043,-7.391502]);
+vertexPosition.push(...[-3.015382,2.757857,-7.882100]);
+vertexPosition.push(...[-3.015382,3.191043,-7.882100]);
+vertexPosition.push(...[-2.890769,2.757857,-7.688344]);
+vertexPosition.push(...[-2.890769,3.191043,-7.688344]);
+
+indexes.push(...[554,553,555]);
+indexes.push(...[556,555,559]);
+indexes.push(...[560,559,557]);
+indexes.push(...[558,557,553]);
+indexes.push(...[559,555,553]);
+indexes.push(...[556,560,558]);
+indexes.push(...[554,555,556]);
+indexes.push(...[556,559,560]);
+indexes.push(...[560,557,558]);
+indexes.push(...[558,553,554]);
+indexes.push(...[559,553,557]);
+indexes.push(...[556,558,554]);
+
+vertexPosition.push(...[-2.633377,2.757857,-7.972083]);
+vertexPosition.push(...[-2.633377,3.191043,-7.972083]);
+vertexPosition.push(...[-2.633377,2.757857,-7.741714]);
+vertexPosition.push(...[-2.633377,3.191043,-7.741714]);
+vertexPosition.push(...[-2.084612,2.757857,-7.972083]);
+vertexPosition.push(...[-2.084612,3.191043,-7.972083]);
+vertexPosition.push(...[-2.084612,2.757857,-7.741714]);
+vertexPosition.push(...[-2.084612,3.191043,-7.741714]);
+
+indexes.push(...[562,561,563]);
+indexes.push(...[564,563,567]);
+indexes.push(...[568,567,565]);
+indexes.push(...[566,565,561]);
+indexes.push(...[567,563,561]);
+indexes.push(...[564,568,566]);
+indexes.push(...[562,563,564]);
+indexes.push(...[564,567,568]);
+indexes.push(...[568,565,566]);
+indexes.push(...[566,561,562]);
+indexes.push(...[567,561,565]);
+indexes.push(...[564,566,562]);
+
+vertexPosition.push(...[-1.826654,2.757857,-7.972083]);
+vertexPosition.push(...[-1.826654,3.191043,-7.972083]);
+vertexPosition.push(...[-1.826654,2.757857,-7.741714]);
+vertexPosition.push(...[-1.826654,3.191043,-7.741714]);
+vertexPosition.push(...[-1.277889,2.757857,-7.972083]);
+vertexPosition.push(...[-1.277889,3.191043,-7.972083]);
+vertexPosition.push(...[-1.277889,2.757857,-7.741714]);
+vertexPosition.push(...[-1.277889,3.191043,-7.741714]);
+
+indexes.push(...[570,569,571]);
+indexes.push(...[572,571,575]);
+indexes.push(...[576,575,573]);
+indexes.push(...[574,573,569]);
+indexes.push(...[575,571,569]);
+indexes.push(...[572,576,574]);
+indexes.push(...[570,571,572]);
+indexes.push(...[572,575,576]);
+indexes.push(...[576,573,574]);
+indexes.push(...[574,569,570]);
+indexes.push(...[575,569,573]);
+indexes.push(...[572,574,570]);
+
+vertexPosition.push(...[-0.249699,2.757857,-7.972083]);
+vertexPosition.push(...[-0.249699,3.191043,-7.972083]);
+vertexPosition.push(...[-0.249699,2.757857,-7.741714]);
+vertexPosition.push(...[-0.249699,3.191043,-7.741714]);
+vertexPosition.push(...[0.299066,2.757857,-7.972083]);
+vertexPosition.push(...[0.299066,3.191043,-7.972083]);
+vertexPosition.push(...[0.299066,2.757857,-7.741714]);
+vertexPosition.push(...[0.299066,3.191043,-7.741714]);
+
+indexes.push(...[578,577,579]);
+indexes.push(...[580,579,583]);
+indexes.push(...[584,583,581]);
+indexes.push(...[582,581,577]);
+indexes.push(...[583,579,577]);
+indexes.push(...[580,584,582]);
+indexes.push(...[578,579,580]);
+indexes.push(...[580,583,584]);
+indexes.push(...[584,581,582]);
+indexes.push(...[582,577,578]);
+indexes.push(...[583,577,581]);
+indexes.push(...[580,582,578]);
+
+vertexPosition.push(...[0.524066,2.757857,-7.972083]);
+vertexPosition.push(...[0.524066,3.191043,-7.972083]);
+vertexPosition.push(...[0.524066,2.757857,-7.741714]);
+vertexPosition.push(...[0.524066,3.191043,-7.741714]);
+vertexPosition.push(...[1.072831,2.757857,-7.972083]);
+vertexPosition.push(...[1.072831,3.191043,-7.972083]);
+vertexPosition.push(...[1.072831,2.757857,-7.741714]);
+vertexPosition.push(...[1.072831,3.191043,-7.741714]);
+
+indexes.push(...[586,585,587]);
+indexes.push(...[588,587,591]);
+indexes.push(...[592,591,589]);
+indexes.push(...[590,589,585]);
+indexes.push(...[591,587,585]);
+indexes.push(...[588,592,590]);
+indexes.push(...[586,587,588]);
+indexes.push(...[588,591,592]);
+indexes.push(...[592,589,590]);
+indexes.push(...[590,585,586]);
+indexes.push(...[591,585,589]);
+indexes.push(...[588,590,586]);
+
+vertexPosition.push(...[-0.996235,2.757857,-7.972083]);
+vertexPosition.push(...[-0.996235,3.191043,-7.972083]);
+vertexPosition.push(...[-0.996235,2.757857,-7.741714]);
+vertexPosition.push(...[-0.996235,3.191043,-7.741714]);
+vertexPosition.push(...[-0.447471,2.757857,-7.972083]);
+vertexPosition.push(...[-0.447471,3.191043,-7.972083]);
+vertexPosition.push(...[-0.447471,2.757857,-7.741714]);
+vertexPosition.push(...[-0.447471,3.191043,-7.741714]);
+
+indexes.push(...[594,593,595]);
+indexes.push(...[596,595,599]);
+indexes.push(...[600,599,597]);
+indexes.push(...[598,597,593]);
+indexes.push(...[599,595,593]);
+indexes.push(...[596,600,598]);
+indexes.push(...[594,595,596]);
+indexes.push(...[596,599,600]);
+indexes.push(...[600,597,598]);
+indexes.push(...[598,593,594]);
+indexes.push(...[599,593,597]);
+indexes.push(...[596,598,594]);
+
+vertexPosition.push(...[1.771125,2.757857,-7.412745]);
+vertexPosition.push(...[1.771125,3.191043,-7.412745]);
+vertexPosition.push(...[1.871711,2.757857,-7.619994]);
+vertexPosition.push(...[1.871711,3.191043,-7.619994]);
+vertexPosition.push(...[1.277433,2.757857,-7.652350]);
+vertexPosition.push(...[1.277433,3.191043,-7.652350]);
+vertexPosition.push(...[1.378019,2.757857,-7.859600]);
+vertexPosition.push(...[1.378019,3.191043,-7.859600]);
+
+indexes.push(...[602,601,603]);
+indexes.push(...[604,603,607]);
+indexes.push(...[608,607,605]);
+indexes.push(...[606,605,601]);
+indexes.push(...[607,603,601]);
+indexes.push(...[604,608,606]);
+indexes.push(...[602,603,604]);
+indexes.push(...[604,607,608]);
+indexes.push(...[608,605,606]);
+indexes.push(...[606,601,602]);
+indexes.push(...[607,601,605]);
+indexes.push(...[604,606,602]);
+
+vertexPosition.push(...[1.927560,2.757857,-6.485769]);
+vertexPosition.push(...[1.927560,3.191043,-6.485769]);
+vertexPosition.push(...[2.157788,2.757857,-6.493806]);
+vertexPosition.push(...[2.157788,3.191043,-6.493806]);
+vertexPosition.push(...[1.908415,2.757857,-7.034200]);
+vertexPosition.push(...[1.908415,3.191043,-7.034200]);
+vertexPosition.push(...[2.138644,2.757857,-7.042237]);
+vertexPosition.push(...[2.138644,3.191043,-7.042237]);
+
+indexes.push(...[610,609,611]);
+indexes.push(...[612,611,615]);
+indexes.push(...[616,615,613]);
+indexes.push(...[614,613,609]);
+indexes.push(...[615,611,609]);
+indexes.push(...[612,616,614]);
+indexes.push(...[610,611,612]);
+indexes.push(...[612,615,616]);
+indexes.push(...[616,613,614]);
+indexes.push(...[614,609,610]);
+indexes.push(...[615,609,613]);
+indexes.push(...[612,614,610]);
+
+vertexPosition.push(...[1.789783,2.757857,-5.948705]);
+vertexPosition.push(...[1.789783,3.191043,-5.948705]);
+vertexPosition.push(...[1.670017,2.757857,-6.145494]);
+vertexPosition.push(...[1.670017,3.191043,-6.145494]);
+vertexPosition.push(...[1.321008,2.757857,-5.663409]);
+vertexPosition.push(...[1.321008,3.191043,-5.663409]);
+vertexPosition.push(...[1.201243,2.757857,-5.860198]);
+vertexPosition.push(...[1.201243,3.191043,-5.860198]);
+
+indexes.push(...[618,617,619]);
+indexes.push(...[620,619,623]);
+indexes.push(...[624,623,621]);
+indexes.push(...[622,621,617]);
+indexes.push(...[623,619,617]);
+indexes.push(...[620,624,622]);
+indexes.push(...[618,619,620]);
+indexes.push(...[620,623,624]);
+indexes.push(...[624,621,622]);
+indexes.push(...[622,617,618]);
+indexes.push(...[623,617,621]);
+indexes.push(...[620,622,618]);
+
+
+  return [indexes, vertexPosition, vertexNormal];
+}
+
+function startGL() 
+{
+  alert("StartGL");
+  let canvas = document.getElementById("canvas3D"); //wyszukanie obiektu w strukturze strony 
+  gl = canvas.getContext("experimental-webgl"); //pobranie kontekstu OpenGL'u z obiektu canvas
+  gl.viewportWidth = canvas.width; //przypisanie wybranej przez nas rozdzielczości do systemu OpenGL
+  gl.viewportHeight = canvas.height;
+  
+    //Kod shaderów
+  const vertextShaderSource = ` //Znak akcentu z przycisku tyldy - na lewo od przycisku 1 na klawiaturze
+    precision highp float;
+    attribute vec3 aVertexPosition; 
+    //attribute vec3 aVertexNormal;
+    uniform mat4 uMMatrix;
+    uniform mat4 uInvMMatrix;
+    uniform mat4 uVMatrix;
+    uniform mat4 uPMatrix;
+    varying vec3 vPos;
+    //varying vec3 vNormal;
+    uniform float uNormalMul;
+    void main(void) {
+      vPos = vec3(uMMatrix * vec4(aVertexPosition, 1.0));
+      gl_Position = uPMatrix * uVMatrix * vec4(vPos,1.0); //Dokonanie transformacji położenia punktów z przestrzeni 3D do przestrzeni obrazu (2D)
+      //vNormal = normalize(mat3(uInvMMatrix) * uNormalMul*aVertexNormal); //Obrot wektorow normalnych
+    }
+  `;
+  const fragmentShaderSource = `
+    precision highp float;
+    varying vec3 vPos;
+    //varying vec3 vNormal;
+    uniform sampler2D uSampler;
+    uniform vec3 uLightPosition;
+    uniform vec3 uColor;
+    void main(void) {
+      //vec3 lightDirection = normalize(uLightPosition - vPos);
+      //float brightness = max(dot(vNormal,lightDirection), 0.0);
+      //gl_FragColor = vec4(vColor,1.0); //Ustalenie stałego koloru wszystkich punktów sceny
+      //gl_FragColor = texture2D(uSampler,vTexUV)*vec4(vColor,1.0); //Odczytanie punktu tekstury i przypisanie go jako koloru danego punktu renderowaniej figury
+      //gl_FragColor = vec4((vNormal+vec3(1.0,1.0,1.0))/2.0,1.0); 
+      //gl_FragColor = clamp(texture2D(uSampler,vTexUV) * vec4(brightness,brightness,brightness,1.0),0.0,1.0);
+      //gl_FragColor = clamp(vec4(uColor,1.0) * vec4(brightness,brightness,brightness,1.0),0.0,1.0);
+      gl_FragColor = clamp(vec4(uColor,1.0) ,0.0,1.0);
+    }
+  `;
+  let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER); //Stworzenie obiektu shadera 
+  let vertexShader   = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(fragmentShader, fragmentShaderSource); //Podpięcie źródła kodu shader
+  gl.shaderSource(vertexShader, vertextShaderSource);
+  gl.compileShader(fragmentShader); //Kompilacja kodu shader
+  gl.compileShader(vertexShader);
+  if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { //Sprawdzenie ewentualnych błedów kompilacji
+    alert(gl.getShaderInfoLog(fragmentShader));
+    return null;
+  }
+  if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+    alert(gl.getShaderInfoLog(vertexShader));
+    return null;
+  }
+  
+  shaderProgram = gl.createProgram(); //Stworzenie obiektu programu 
+  gl.attachShader(shaderProgram, vertexShader); //Podpięcie obu shaderów do naszego programu wykonywanego na karcie graficznej
+  gl.attachShader(shaderProgram, fragmentShader);
+  gl.linkProgram(shaderProgram);
+  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych błedów
+  
+  //Opis sceny 3D, położenie punktów w przestrzeni 3D w formacie X,Y,Z 
+  let vertexPosition; //3 punkty po 3 składowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójkąt
+  let vertexNormal;
+  let indexes;
+  
+  //[vertexPosition, vertexColor, vertexCoords, vertexNormal] = CreateShpere(0,0,0,2, 6, 12); 
+  //[indexes, vertexPosition, vertexNormal] = CreateBox(0,0,0,1,1,1);
+  [indexes, vertexPosition, vertexNormal] = CreateTetris();
+  
+  vertexPositionBuffer = gl.createBuffer(); //Stworzenie tablicy w pamieci karty graficznej
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPosition), gl.STATIC_DRAW);
+  vertexPositionBuffer.itemSize = 3; //zdefiniowanie liczby współrzednych per wierzchołek
+  vertexPositionBuffer.numItems = vertexPosition.length/9; //Zdefinoiowanie liczby trójkątów w naszym buforze
+  
+  vertexNormalBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexNormalBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormal), gl.STATIC_DRAW);
+  vertexNormalBuffer.itemSize = 3;
+  vertexNormalBuffer.numItems = vertexNormal.length/9;
+  
+  indexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexes), gl.STATIC_DRAW);
+  indexBuffer.numItems = indexes.length;
+
+  //Macierze opisujące położenie wirtualnej kamery w przestrzenie 3D
+  let aspect = gl.viewportWidth/gl.viewportHeight;
+  let fov = 45.0 * Math.PI / 180.0; //Określenie pola widzenia kamery
+  let zFar = 100.0; //Ustalenie zakresów renderowania sceny 3D (od obiektu najbliższego zNear do najdalszego zFar)
+  let zNear = 0.1;
+  uPMatrix = [
+   1.0/(aspect*Math.tan(fov/2)),0                           ,0                         ,0                            ,
+   0                         ,1.0/(Math.tan(fov/2))         ,0                         ,0                            ,
+   0                         ,0                           ,-(zFar+zNear)/(zFar-zNear)  , -1,
+   0                         ,0                           ,-(2*zFar*zNear)/(zFar-zNear) ,0.0,
+  ];
+  Tick();
+} 
+//let angle = 45.0; //Macierz transformacji świata - określenie położenia kamery 
+
+var angleZ = 30.0;
+var angleY = 90.0;
+var angleX = 30.0;
+var KameraPositionZ = -60.0;
+
+var Object1PositionX = 10.0;
+var Object1PositionY = 0.0;
+var Object1PositionZ = 0.0;
+var Object1Sizedx = 1;
+var Object1Sizedy = 1;
+var Object1Sizedz = 1;
+var Object1AngleZ = 0.0;
+
+var LightSize = 0.1;
+var LightPositionX = 0;
+var LightPositionY = 0;
+var LightPositionZ = 3;
+
+
+function Tick()
+{ 
+  let uMMatrix0 = CreateIdentytyMatrix(); 
+  let uMMatrix1 = CreateIdentytyMatrix();
+  let uMMatrix2 = CreateIdentytyMatrix();
+  let uMMatrix3 = CreateIdentytyMatrix();
+
+  let uMMatrix4 = CreateIdentytyMatrix();
+  let uMMatrix5 = CreateIdentytyMatrix();
+  let uMMatrix6 = CreateIdentytyMatrix();
+  
+  let uVMatrix = CreateIdentytyMatrix();
+  
+  
+  uVMatrix = MatrixMul(uVMatrix,CreateRotationXMatrix(angleX));
+  uVMatrix = MatrixMul(uVMatrix,CreateRotationYMatrix(angleY));
+  uVMatrix = MatrixMul(uVMatrix,CreateRotationZMatrix(angleZ));
+  uVMatrix = MatrixMul(uVMatrix,CreateTranslationMatrix(0,0,KameraPositionZ));
+  
+  uMMatrix1 = MatrixMul(uMMatrix1,CreateScaleMatrix(Object1Sizedx,Object1Sizedy,Object1Sizedz));
+  uMMatrix1 = MatrixMul(uMMatrix1,CreateTranslationMatrix(Object1Sizedx,0.0,0.0)); 
+  uMMatrix1 = MatrixMul(uMMatrix1,CreateRotationZMatrix(Object1AngleZ));
+  uMMatrix1 = MatrixMul(uMMatrix1,CreateTranslationMatrix(Object1PositionX,Object1PositionY,Object1PositionZ));  
+  
+  uMMatrix0 = MatrixMul(uMMatrix0,CreateScaleMatrix(LightSize,LightSize,LightSize));
+  uMMatrix0 = MatrixMul(uMMatrix0,CreateTranslationMatrix(LightPositionX,LightPositionY,LightPositionZ));
+  
+  //alert(uPMatrix);
+  
+  //Render Scene
+  gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight); 
+  gl.clearColor(1.0,0.0,0.0,1.0); //Wyczyszczenie obrazu kolorem czerwonym
+  gl.clearDepth(1.0);             //Wyczyścienie bufora głebi najdalszym planem
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(shaderProgram)   //Użycie przygotowanego programu shaderowego
+  
+  gl.enable(gl.DEPTH_TEST);           // Włączenie testu głębi - obiekty bliższe mają przykrywać obiekty dalsze
+  gl.depthFunc(gl.LEQUAL);            // 
+  
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uPMatrix"), false, new Float32Array(uPMatrix)); //Wgranie macierzy kamery do pamięci karty graficznej
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uVMatrix"), false, new Float32Array(uVMatrix));
+  gl.uniform1f(gl.getUniformLocation(shaderProgram, "uNormalMul"),1.0);
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uLightPosition"),LightPositionX,LightPositionY,LightPositionZ);
+  
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie położenia
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexPosition"), vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexNormal"));  //Przekazywanie wektorów normalnych
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexNormalBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexNormal"), vertexNormalBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+  
+  
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix1));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix1)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),0.5,0.0,0.0);  
+  //gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+  gl.drawElements(gl.TRIANGLES, indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+  
+  
+  //Obiekt Światła
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix0));
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix0)));
+  gl.uniform3f(gl.getUniformLocation(shaderProgram, "uColor"),1.0,1.0,0.0);
+  gl.uniform1f(gl.getUniformLocation(shaderProgram, "uNormalMul"),-1.0);  
+  //gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+  gl.drawElements(gl.TRIANGLES, indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+  
+  setTimeout(Tick,100);
+}
+function handlekeydown(e)
+{
+ // Q W E A S D
+ if(e.keyCode==87) angleX=angleX+1.0; //W
+ if(e.keyCode==83) angleX=angleX-1.0; //S
+ if(e.keyCode==68) angleY=angleY+1.0;
+ if(e.keyCode==65) angleY=angleY-1.0;
+ if(e.keyCode==81) angleZ=angleZ+1.0;
+ if(e.keyCode==69) angleZ=angleZ-1.0;
+ //alert(e.keyCode);
+ //alert(angleX);
+ 
+ //U I O J K L
+ if(e.keyCode==76) LightPositionX=LightPositionX+0.1;
+ if(e.keyCode==74) LightPositionX=LightPositionX-0.1;
+ if(e.keyCode==73) LightPositionY=LightPositionY+0.1;
+ if(e.keyCode==75) LightPositionY=LightPositionY-0.1;
+ if(e.keyCode==85) LightPositionZ=LightPositionZ+0.1;
+ if(e.keyCode==79) LightPositionZ=LightPositionZ-0.1;
+ 
+ //Z X
+ if(e.keyCode==88) Object1AngleZ=Object1AngleZ-0.1;
+ if(e.keyCode==90) Object1AngleZ=Object1AngleZ+0.1;
+ 
+ //C V
+ if(e.keyCode==67) Object2AngleZ=Object2AngleZ-0.1;
+ if(e.keyCode==86) Object2AngleZ=Object2AngleZ+0.1;
+ 
+ //B N
+ if(e.keyCode==66) Object3AngleZ=Object3AngleZ-0.1;
+ if(e.keyCode==78) Object3AngleZ=Object3AngleZ+0.1;
+}
+</script>
+</head>
+<body onload="startGL()" onkeydown="handlekeydown(event)">
+<canvas id="canvas3D" width="640" height="480" style="border: solid black 1px"></canvas>
+
+</body>
+</html>
