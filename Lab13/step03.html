@@ -5,7 +5,7 @@
 var gl;
 var shaderProgram;
 var uPMatrix;
-var vertexPositionBuffer;
+var vertexEffectPositionBuffer;
 var vertexColorBuffer;
 function MatrixMul(a,b) //Mnożenie macierzy
 {
@@ -110,7 +110,7 @@ function CreatePointCloud(sx,ex,sy,ey,sz,ez,svx,evx,svy,evy,svz,evz,sa,ea,n)
   return [vertexPos,vertexVelocity,vertexColor,vertexAge];
 }
 //Opis sceny 3D, położenie punktów w przestrzeni 3D w formacie X,Y,Z 
-let vertexPosition; //3 punkty po 3 składowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójkąt
+let vertexEffectPosition; //3 punkty po 3 składowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójkąt
 let vertexVelocity;
 let vertexColor;
 let vertexAge;
@@ -129,13 +129,13 @@ let evz =  1.0;
 let sa = 0.2; //Czas życia nowych cząsteczek
 let ea = 0.8;
 let n = 100000;
-function updatePointCloud(vertexPosition,vertexVelocity,vertexColor,vertexAge,n,dt, sx,ex,sy,ey,sz,ez,svx,evx,svy,evy,svz,evz,sa,ea)
+function updatePointCloud(vertexEffectPosition,vertexVelocity,vertexColor,vertexAge,n,dt, sx,ex,sy,ey,sz,ez,svx,evx,svy,evy,svz,evz,sa,ea)
 {
   for(let i=0;i<n;i++)
   {
-    vertexPosition[i*3+0] = vertexPosition[i*3+0] + vertexVelocity[i*3+0]*dt;
-    vertexPosition[i*3+1] = vertexPosition[i*3+1] + vertexVelocity[i*3+1]*dt;
-    vertexPosition[i*3+2] = vertexPosition[i*3+2] + vertexVelocity[i*3+2]*dt;
+    vertexEffectPosition[i*3+0] = vertexEffectPosition[i*3+0] + vertexVelocity[i*3+0]*dt;
+    vertexEffectPosition[i*3+1] = vertexEffectPosition[i*3+1] + vertexVelocity[i*3+1]*dt;
+    vertexEffectPosition[i*3+2] = vertexEffectPosition[i*3+2] + vertexVelocity[i*3+2]*dt;
 
     //vertexVelocity[i*3+0] += (Math.random()-0.5)*1;
     vertexVelocity[i*3+0] += (Math.random())*0.2;
@@ -155,9 +155,9 @@ function updatePointCloud(vertexPosition,vertexVelocity,vertexColor,vertexAge,n,
     vertexAge[i] = vertexAge[i] - dt;
     if(vertexAge[i]<0)
     {
-      vertexPosition[i*3+0] = sx + Math.random()*(ex-sx);
-      vertexPosition[i*3+1] = sy + Math.random()*(ey-sy);
-      vertexPosition[i*3+2] = sz + Math.random()*(ez-sz);
+      vertexEffectPosition[i*3+0] = sx + Math.random()*(ex-sx);
+      vertexEffectPosition[i*3+1] = sy + Math.random()*(ey-sy);
+      vertexEffectPosition[i*3+2] = sz + Math.random()*(ez-sz);
       //Velocity randomization
       vertexVelocity[i*3+0] = svx + Math.random()*(evx-svx);
       vertexVelocity[i*3+1] = svy + Math.random()*(evy-svy);
@@ -166,11 +166,12 @@ function updatePointCloud(vertexPosition,vertexVelocity,vertexColor,vertexAge,n,
       vertexAge[i] = sa + Math.random()*(ea-sa);
     }    
 
-    vertexColor[i*3+0] = (ea-vertexAge[i])/ea; //Red
-    vertexColor[i*3+1] = 0.0; //Green
-    vertexColor[i*3+2] = 1.0-(ea-vertexAge[i])/ea; //Blue
+    vertexColor[i*3+0] = 1.0
+    vertexColor[i*3+1] = 1.0-(ea-vertexAge[i])/ea
+    vertexColor[i*3+2] = (ea-vertexAge[i])/ea-1
+    vertexColor[i*3+3] = 1.0//Blue
   }
-  return [vertexPosition,vertexVelocity,vertexColor,vertexAge];
+  return [vertexEffectPosition,vertexVelocity,vertexColor,vertexAge];
 }
 function startGL() 
 {
@@ -183,7 +184,7 @@ function startGL()
     //Kod shaderów
   const vertextShaderSource = ` //Znak akcentu z przycisku tyldy - na lewo od przycisku 1 na klawiaturze
     precision highp float;
-    attribute vec3 aVertexPosition; 
+    attribute vec3 avertexEffectPosition; 
     attribute vec3 aVertexColor;
     uniform mat4 uMMatrix;
     uniform mat4 uVMatrix;
@@ -191,7 +192,7 @@ function startGL()
     varying vec3 vPos;
     varying vec3 vColor;
     void main(void) {
-      vPos = vec3(uMMatrix * vec4(aVertexPosition, 1.0));
+      vPos = vec3(uMMatrix * vec4(avertexEffectPosition, 1.0));
       gl_Position = uPMatrix * uVMatrix * vec4(vPos,1.0); //Dokonanie transformacji położenia punktów z przestrzeni 3D do przestrzeni obrazu (2D)
       vColor = aVertexColor;
       gl_PointSize = 2.0;
@@ -226,15 +227,15 @@ function startGL()
   gl.linkProgram(shaderProgram);
   if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych błedów
   
-  //[vertexPosition, vertexColor, vertexCoords, vertexNormal] = CreateShpere(0,0,0,2, 6, 12); 
-  [vertexPosition, vertexVelocity, vertexColor, vertexAge] = CreatePointCloud(sx,ex,sy,ey,sz,ez,svx,evx,svy,evy,svz,evz,sa,ea,n);
+  //[vertexEffectPosition, vertexColor, vertexCoords, vertexNormal] = CreateShpere(0,0,0,2, 6, 12); 
+  [vertexEffectPosition, vertexVelocity, vertexColor, vertexAge] = CreatePointCloud(sx,ex,sy,ey,sz,ez,svx,evx,svy,evy,svz,evz,sa,ea,n);
   
   //console.log(vertexCoords);
-  vertexPositionBuffer = gl.createBuffer(); //Stworzenie tablicy w pamieci karty graficznej
-  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPosition), gl.STATIC_DRAW);
-  vertexPositionBuffer.itemSize = 3; //zdefiniowanie liczby współrzednych per wierzchołek
-  vertexPositionBuffer.numItems = vertexPosition.length/9; //Zdefinoiowanie liczby punktów w naszym buforze
+  vertexEffectPositionBuffer = gl.createBuffer(); //Stworzenie tablicy w pamieci karty graficznej
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexEffectPositionBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexEffectPosition), gl.STATIC_DRAW);
+  vertexEffectPositionBuffer.itemSize = 3; //zdefiniowanie liczby współrzednych per wierzchołek
+  vertexEffectPositionBuffer.numItems = vertexEffectPosition.length/9; //Zdefinoiowanie liczby punktów w naszym buforze
   
   vertexColorBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
@@ -242,7 +243,7 @@ function startGL()
   vertexColorBuffer.itemSize = 3;
   vertexColorBuffer.numItems = vertexColor.length/9;
   
-  console.log(vertexPosition);
+  console.log(vertexEffectPosition);
   
   //Macierze opisujące położenie wirtualnej kamery w przestrzenie 3D
   let aspect = gl.viewportWidth/gl.viewportHeight;
@@ -270,9 +271,9 @@ var CloudPositionZ = 0.0;
 
 function Tick()
 { 
-  [vertexPosition, vertexVelocity, vertexColor, vertexAge] = updatePointCloud(vertexPosition,vertexVelocity,vertexColor,vertexAge,n,0.01, sx,ex,sy,ey,sz,ez,svx,evx,svy,evy,svz,evz,sa,ea);
-  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPosition), gl.STATIC_DRAW);
+  [vertexEffectPosition, vertexVelocity, vertexColor, vertexAge] = updatePointCloud(vertexEffectPosition,vertexVelocity,vertexColor,vertexAge,n,0.01, sx,ex,sy,ey,sz,ez,svx,evx,svy,evy,svz,evz,sa,ea);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexEffectPositionBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexEffectPosition), gl.STATIC_DRAW);
   
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexColor), gl.STATIC_DRAW);
@@ -292,7 +293,7 @@ function Tick()
   
   //Render Scene
   gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight); 
-  gl.clearColor(1.0,0.0,0.0,1.0); //Wyczyszczenie obrazu kolorem czerwonym
+  gl.clearColor(0.3,0.3,0.3,1.0); //Wyczyszczenie obrazu kolorem czerwonym
   gl.clearDepth(1.0);             //Wyczyścienie bufora głebi najdalszym planem
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.useProgram(shaderProgram)   //Użycie przygotowanego programu shaderowego
@@ -304,15 +305,15 @@ function Tick()
   gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uVMatrix"), false, new Float32Array(uVMatrix));  
   gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix1));
   
-  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie położenia
-  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
-  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexPosition"), vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "avertexEffectPosition"));  //Przekazanie położenia
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexEffectPositionBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "avertexEffectPosition"), vertexEffectPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
   
   gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexColor"));  //Przekazywanie wektorów colorów
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
   gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexColor"), vertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
   
-  gl.drawArrays(gl.POINTS, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+  gl.drawArrays(gl.POINTS, 0, vertexEffectPositionBuffer.numItems*vertexEffectPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
   
   setTimeout(Tick,100);
 }
