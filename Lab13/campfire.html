@@ -4,6 +4,7 @@
 <script type="text/javascript">
 var gl;
 var shaderProgram;
+var shaderProgram_2;
 var uPMatrix;
 var vertexPositionBuffer;
 var VertexEffectPositionBuffer;
@@ -507,13 +508,13 @@ async function startGL()
     alert(gl.getShaderInfoLog(vertexShader));
     return null;
   }
-  
+
   shaderProgram = gl.createProgram(); //Stworzenie obiektu programu 
   gl.attachShader(shaderProgram, vertexShader); //Podpięcie obu shaderów do naszego programu wykonywanego na karcie graficznej
   gl.attachShader(shaderProgram, fragmentShader);
   gl.linkProgram(shaderProgram);
   if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych błedów
-  
+
   const vertextShaderSource_2 = ` //Znak akcentu z przycisku tyldy - na lewo od przycisku 1 na klawiaturze
     precision highp float;
     attribute vec3 aVertexPosition;
@@ -569,7 +570,6 @@ async function startGL()
       gl_FragColor = vec4(vColor,1.0);
     }
   `;
-  
   let fragmentShader_2 = gl.createShader(gl.FRAGMENT_SHADER); //Stworzenie obiektu shadera 
   let vertexShader_2   = gl.createShader(gl.VERTEX_SHADER);
   gl.shaderSource(fragmentShader_2, fragmentShaderSource_2); //Podpięcie źródła kodu shader
@@ -590,7 +590,7 @@ async function startGL()
   gl.attachShader(shaderProgram_2, fragmentShader_2);
   gl.linkProgram(shaderProgram_2);
   if (!gl.getProgramParameter(shaderProgram_2, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych błedów
-
+  
    //[VertexEffectPosition, vertexColor, vertexCoords, vertexNormal] = CreateShpere(0,0,0,2, 6, 12); 
    [VertexEffectPosition, vertexVelocity, vertexColor, vertexAge] = CreatePointCloud(sx,ex,sy,ey,sz,ez,svx,evx,svy,evy,svz,evz,sa,ea,n);
   //Opis sceny 3D, położenie punktów w przestrzeni 3D w formacie X,Y,Z 
@@ -733,7 +733,7 @@ function Tick()
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.getExtension('OES_element_index_uint');
   gl.useProgram(shaderProgram)
-  gl.useProgram(shaderProgram_2)    //Użycie przygotowanego programu shaderowego
+    //Użycie przygotowanego programu shaderowego
   
   gl.enable(gl.DEPTH_TEST);           // Włączenie testu głębi - obiekty bliższe mają przykrywać obiekty dalsze
   gl.depthFunc(gl.LEQUAL);            // 
@@ -743,9 +743,10 @@ function Tick()
   gl.uniform1f(gl.getUniformLocation(shaderProgram, "uNormalMul"),1.0);
   gl.uniform3f(gl.getUniformLocation(shaderProgram, "uLightPosition"),LightPositionX,LightPositionY,LightPositionZ);
   
-  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram_2, "aVertexEffectPosition"));  //Przekazanie położenia
+  gl.useProgram(shaderProgram)
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexEffectPosition"));  //Przekazanie położenia
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
-  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram_2, "aVertexEffectPosition"), vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexEffectPosition"), vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
   
   gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie położenia
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
@@ -773,17 +774,17 @@ function Tick()
   //gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
   gl.drawElements(gl.TRIANGLES, indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
   
-  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram_2, "aVertexEffectPosition"));  //Przekazanie położenia
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexEffectPosition"));  //Przekazanie położenia
   gl.bindBuffer(gl.ARRAY_BUFFER, VertexEffectPositionBuffer);
-  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram_2, "aVertexEffectPosition"), VertexEffectPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexEffectPosition"), VertexEffectPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
   
   gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "avertexPosition"));  //Przekazanie położenia
   gl.bindBuffer(gl.ARRAY_BUFFER, VertexEffectPositionBuffer);
   gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "avertexPosition"), VertexEffectPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
   
-  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram_2, "aVertexColor"));  //Przekazywanie wektorów colorów
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexColor"));  //Przekazywanie wektorów colorów
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
-  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram_2, "aVertexColor"), vertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexColor"), vertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
   
   gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMMatrix"), false, new Float32Array(uMMatrix2));
   //gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uInvMMatrix"), false, new Float32Array(MatrixTransposeInverse(uMMatrix2)));
