@@ -1,0 +1,1130 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<script type="text/javascript">
+var gl;
+var shaderProgram;
+var uPMatrix;
+var vertexPositionBuffer;
+var vertexColorBuffer;
+let uMVMatrix = null;
+function MatrixMul(a,b) //Mnożenie macierzy
+{
+  c = [
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0,
+  0,0,0,0
+  ]
+  for(let i=0;i<4;i++)
+  {
+    for(let j=0;j<4;j++)
+    {
+      c[i*4+j] = 0.0;
+      for(let k=0;k<4;k++)
+      {
+        c[i*4+j]+= a[i*4+k] * b[k*4+j];
+      }
+    }
+  }
+  return c;
+}
+
+function startGL() 
+{
+  alert("StartGL");
+  let canvas = document.getElementById("canvas3D"); //wyszukanie obiektu w strukturze strony 
+  gl = canvas.getContext("experimental-webgl"); //pobranie kontekstu OpenGL'u z obiektu canvas
+  gl.viewportWidth = canvas.width; //przypisanie wybranej przez nas rozdzielczości do systemu OpenGL
+  gl.viewportHeight = canvas.height;
+  
+    //Kod shaderów
+  const vertextShaderSource = ` //Znak akcentu z przycisku tyldy - na lewo od przycisku 1 na klawiaturze
+    precision highp float;
+    attribute vec3 aVertexPosition; 
+    attribute vec3 aVertexColor;
+    attribute vec2 aVertexCoords;
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    varying vec3 vColor;
+    varying vec2 vTexUV;
+    void main(void) {
+      gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0); //Dokonanie transformacji położenia punktów z przestrzeni 3D do przestrzeni obrazu (2D)
+      vColor = aVertexColor;
+      vTexUV = aVertexCoords;
+    }
+  `;
+  const fragmentShaderSource = `
+    precision highp float;
+    varying vec3 vColor;
+    varying vec2 vTexUV;
+    uniform sampler2D uSampler;
+    void main(void) {
+      //gl_FragColor = vec4(vColor,1.0); //Ustalenie stałego koloru wszystkich punktów sceny
+      gl_FragColor = texture2D(uSampler,vTexUV); //Odczytanie punktu tekstury i przypisanie go jako koloru danego punktu renderowaniej figury 
+      //*vec4(vColor,1.0);
+    }
+  `;
+  let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER); //Stworzenie obiektu shadera 
+  let vertexShader   = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(fragmentShader, fragmentShaderSource); //Podpięcie źródła kodu shader
+  gl.shaderSource(vertexShader, vertextShaderSource);
+  gl.compileShader(fragmentShader); //Kompilacja kodu shader
+  gl.compileShader(vertexShader);
+  if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) { //Sprawdzenie ewentualnych błedów kompilacji
+    alert(gl.getShaderInfoLog(fragmentShader));
+    return null;
+  }
+  if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+    alert(gl.getShaderInfoLog(vertexShader));
+    return null;
+  }
+  
+  shaderProgram = gl.createProgram(); //Stworzenie obiektu programu 
+  gl.attachShader(shaderProgram, vertexShader); //Podpięcie obu shaderów do naszego programu wykonywanego na karcie graficznej
+  gl.attachShader(shaderProgram, fragmentShader);
+  gl.linkProgram(shaderProgram);
+  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) alert("Could not initialise shaders");  //Sprawdzenie ewentualnych błedów
+  
+  
+  //Opis sceny 3D, położenie punktów w przestrzeni 3D w formacie X,Y,Z 
+  /*let vertexPosition = [
+    -5.0,0.0,-5.0, 5.0,0.0,-5.0, -5.0,0.0,5.0,
+    5.0,0.0,5.0, -5.0,0.0,5.0, 5.0,0.0,-5.0,
+  ]
+  */
+  let vertexPosition = [
+  //PLANETS 
+  //SUN
+  //Top
+    -5.0, +5.0, -5.0,  -5.0, +5.0, +5.0,  +5.0, +5.0, +5.0, //3 punkty po 3 składowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójkąt
+    -5.0, +5.0, -5.0,  +5.0, +5.0, +5.0,  +5.0, +5.0, -5.0,
+  //Left
+    -5.0, -5.0, +5.0,  -5.0, +5.0, +5.0,  -5.0, -5.0, -5.0,
+    -5.0, -5.0, -5.0,  -5.0, +5.0, +5.0,  -5.0, +5.0, -5.0,
+  //Right
+    +5.0, +5.0, +5.0,  +5.0, -5.0, +5.0,  +5.0, -5.0, -5.0,
+    +5.0, +5.0, +5.0,  +5.0, -5.0, -5.0,  +5.0, +5.0, -5.0,
+  //Front
+    +5.0, -5.0, +5.0,  +5.0, +5.0, +5.0,  -5.0, -5.0, +5.0,
+    -5.0, +5.0, +5.0,  -5.0, -5.0, +5.0,  +5.0, +5.0, +5.0,
+  //Back
+    +5.0, +5.0, -5.0,  +5.0, -5.0, -5.0,  -5.0, -5.0, -5.0,
+    +5.0, +5.0, -5.0,  -5.0, -5.0, -5.0,  -5.0, +5.0, -5.0,
+  //Bottom
+    -5.0, -5.0, +5.0,  -5.0, -5.0, -5.0,  +5.0, -5.0, +5.0,
+    +5.0, -5.0, +5.0,  -5.0, -5.0, -5.0,  +5.0, -5.0, -5.0,
+
+  //MERCURY
+    //Top
+    +8.0, +1.0, -1.0,  +8.0, +1.0, +1.0,  +10.0, +1.0, +1.0, 
+    +8.0, +1.0, -1.0,  +10.0, +1.0, +1.0,  +10.0, +1.0, -1.0,
+  //Left
+    +8.0, -1.0, +1.0,  +8.0, +1.0, +1.0,  +8.0, -1.0, -1.0,
+    +8.0, -1.0, -1.0,  +8.0, +1.0, +1.0,  +8.0, +1.0, -1.0,
+  //Right
+    +10.0, +1.0, +1.0,  +10.0, -1.0, +1.0,  +10.0, -1.0, -1.0,
+    +10.0, +1.0, +1.0,  +10.0, -1.0, -1.0,  +10.0, +1.0, -1.0,
+  //Front
+    +10.0, -1.0, +1.0,  +10.0, +1.0, +1.0,  +8.0, -1.0, +1.0,
+    +8.0, +1.0, +1.0,  +8.0, -1.0, +1.0,  +10.0, +1.0, +1.0,
+  //Back
+    +10.0, +1.0, -1.0,  +10.0, -1.0, -1.0,  +8.0, -1.0, -1.0,
+    +10.0, +1.0, -1.0,  +8.0, -1.0, -1.0,  +8.0, +1.0, -1.0,
+  //Bottom
+    +8.0, -1.0, +1.0,  +8.0, -1.0, -1.0,  +10.0, -1.0, +1.0,
+    +10.0, -1.0, +1.0,  +8.0, -1.0, -1.0,  +10.0, -1.0, -1.0,
+
+  //VENUS
+    //Top
+    +8.0, +1.0, -13.0,  +8.0, +1.0, -11.0,  +10.0, +1.0, -11.0, 
+    +8.0, +1.0, -13.0,  +10.0, +1.0, -11.0,  +10.0, +1.0, -13.0,
+  //Left
+    +8.0, -1.0, -11.0,  +8.0, +1.0, -11.0,  +8.0, -1.0, -13.0,
+    +8.0, -1.0, -13.0,  +8.0, +1.0, -11.0,  +8.0, +1.0, -13.0,
+  //Right
+    +10.0, +1.0, -11.0,  +10.0, -1.0, -11.0,  +10.0, -1.0, -13.0,
+    +10.0, +1.0, -11.0,  +10.0, -1.0, -13.0,  +10.0, +1.0, -13.0,
+  //Front
+    +10.0, -1.0, -11.0,  +10.0, +1.0, -11.0,  +8.0, -1.0, -11.0,
+    +8.0, +1.0, -11.0,  +8.0, -1.0, -11.0,  +10.0, +1.0, -11.0,
+  //Back
+    +10.0, +1.0, -13.0,  +10.0, -1.0, -13.0,  +8.0, -1.0, -13.0,
+    +10.0, +1.0, -13.0,  +8.0, -1.0, -13.0,  +8.0, +1.0, -13.0,
+  //Bottom
+    +8.0, -1.0, -11.0,  +8.0, -1.0, -13.0,  +10.0, -1.0, -11.0,
+    +10.0, -1.0, -11.0,  +8.0, -1.0, -13.0,  +10.0, -1.0, -13.0,
+
+  //EARTH
+    //Top
+    -17.0, +2.0, -14.0,  -17.0, +2.0, -11.0,  -14.0, +2.0, -11.0, 
+    -17.0, +2.0, -14.0,  -14.0, +2.0, -11.0,  -14.0, +2.0, -14.0,
+  //Left
+  -17.0, -1.0, -11.0,  -17.0, +2.0, -11.0,  -17.0, -1.0, -14.0,
+  -17.0, -1.0, -14.0,  -17.0, +2.0, -11.0,  -17.0, +2.0, -14.0,
+  //Right
+    -14.0, +2.0, -11.0,  -14.0, -1.0, -11.0,  -14.0, -1.0, -14.0,
+    -14.0, +2.0, -11.0,  -14.0, -1.0, -14.0,  -14.0, +2.0, -14.0,
+  //Front
+  -14.0, -1.0, -11.0,  -14.0, +2.0, -11.0,  -17.0, -1.0, -11.0,
+    -17.0, +2.0, -11.0,  -17.0, -1.0, -11.0,  -14.0, +2.0, -11.0,
+  //Back
+  -14.0, +2.0, -14.0,  -14.0, -1.0, -14.0,  -17.0, -1.0, -14.0,
+  -14.0, +2.0, -14.0,  -17.0, -1.0, -14.0,   -17.0, +2.0, -14.0,
+  //Bottom
+  -17.0, -1.0, -11.0,  -17.0, -1.0, -14.0,  -14.0, -1.0, -11.0,
+  -14.0, -1.0, -11.0,  -17.0, -1.0, -14.0,  -14.0, -1.0, -14.0,
+
+  //MOON
+  //EARTH
+    //Top
+    -20.0, +2.0, -12.0,  -20.0, +2.0, -11.0,  -19.0, +2.0, -11.0, 
+    -20.0, +2.0, -12.0,  -19.0, +2.0, -11.0,  -19.0, +2.0, -12.0,
+  //Left
+  -20.0, +1.0, -11.0,  -20.0, +2.0, -11.0,  -20.0, +1.0, -12.0,
+  -20.0, +1.0, -12.0,  -20.0, +2.0, -11.0,  -20.0, +2.0, -12.0,
+  //Right
+    -19.0, +2.0, -11.0,  -19.0, +1.0, -11.0,  -19.0, +1.0, -12.0,
+    -19.0, +2.0, -11.0,  -19.0, +1.0, -12.0,  -19.0, +2.0, -12.0,
+  //Front
+  -19.0, +1.0, -11.0,  -19.0, +2.0, -11.0,  -20.0, +1.0, -11.0,
+    -20.0, +2.0, -11.0,  -20.0, +1.0, -11.0,  -19.0, +2.0, -11.0,
+  //Back
+  -19.0, +2.0, -12.0,  -19.0, +1.0, -12.0,  -20.0, +1.0, -12.0,
+  -19.0, +2.0, -12.0,  -20.0, +1.0, -12.0,   -20.0, +2.0, -12.0,
+  //Bottom
+  -20.0, +1.0, -11.0,  -20.0, +1.0, -12.0,  -19.0, +1.0, -11.0,
+  -19.0, +1.0, -11.0,  -20.0, +1.0, -12.0,  -19.0, +1.0, -12.0,
+
+  //MARS
+    //Top
+    -17.0, +2.0, +14.0,  -17.0, +2.0, +11.0,  -14.0, +2.0, +11.0, 
+    -17.0, +2.0, +14.0,  -14.0, +2.0, +11.0,  -14.0, +2.0, +14.0,
+  //Left
+  -17.0, -1.0, +11.0,  -17.0, +2.0, +11.0,  -17.0, -1.0, +14.0,
+  -17.0, -1.0, +14.0,  -17.0, +2.0, +11.0,  -17.0, +2.0, +14.0,
+  //Right
+    -14.0, +2.0, +11.0,  -14.0, -1.0, +11.0,  -14.0, -1.0, +14.0,
+    -14.0, +2.0, +11.0,  -14.0, -1.0, +14.0,  -14.0, +2.0, +14.0,
+  //Front
+  -14.0, -1.0, +11.0,  -14.0, +2.0, +11.0,  -17.0, -1.0, +11.0,
+    -17.0, +2.0, +11.0,  -17.0, -1.0, +11.0,  -14.0, +2.0, +11.0,
+  //Back
+  -14.0, +2.0, +14.0,  -14.0, -1.0, +14.0,  -17.0, -1.0, +14.0,
+  -14.0, +2.0, +14.0,  -17.0, -1.0, +14.0,   -17.0, +2.0, +14.0,
+  //Bottom
+  -17.0, -1.0, +11.0,  -17.0, -1.0, +14.0,  -14.0, -1.0, +11.0,
+  -14.0, -1.0, +11.0,  -17.0, -1.0, +14.0,  -14.0, -1.0, +14.0,
+
+  //JUPITER
+    //Top
+    +26.0, +2.0, +14.0,  +26.0, +2.0, +8.0,  +32.0, +2.0, +8.0, 
+    +26.0, +2.0, +14.0,  +32.0, +2.0, +8.0,  +32.0, +2.0, +14.0,
+  //Left
+  +26.0, -4.0, +8.0,  +26.0, +2.0, +8.0,  +26.0, -4.0, +14.0,
+  +26.0, -4.0, +14.0,  +26.0, +2.0, +8.0,  +26.0, +2.0, +14.0,
+  //Right
+  +32.0, +2.0, +8.0,  +32.0, -4.0, +8.0,  +32.0, -4.0, +14.0,
+  +32.0, +2.0, +8.0,  +32.0, -4.0, +14.0,  +32.0, +2.0, +14.0,
+  //Front
+  +32.0, -4.0, +8.0,  +32.0, +2.0, +8.0,  +26.0, -4.0, +8.0,
+  +26.0, +2.0, +8.0,  +26.0, -4.0, +8.0,  +32.0, +2.0, +8.0,
+  //Back
+  +32.0, +2.0, +14.0,  +32.0, -4.0, +14.0,  +26.0, -4.0, +14.0,
+  +32.0, +2.0, +14.0,  +26.0, -4.0, +14.0,   +26.0, +2.0, +14.0,
+  //Bottom
+  +26.0, -4.0, +8.0,  +26.0, -4.0, +14.0,  +32.0, -4.0, +8.0,
+  +32.0, -4.0, +8.0,  +26.0, -4.0, +14.0,  +32.0, -4.0, +14.0,
+
+   //SATURN
+    //Top
+    +26.0, +2.0, -18.0,  +26.0, +2.0, -12.0,  +32.0, +2.0, -12.0, 
+    +26.0, +2.0, -18.0,  +32.0, +2.0, -12.0,  +32.0, +2.0, -18.0,
+  //Left
+  +26.0, -4.0, -12.0,  +26.0, +2.0, -12.0,  +26.0, -4.0, -18.0,
+  +26.0, -4.0, -18.0,  +26.0, +2.0, -12.0,  +26.0, +2.0, -18.0,
+  //Right
+  +32.0, +2.0, -12.0,  +32.0, -4.0, -12.0,  +32.0, -4.0, -18.0,
+  +32.0, +2.0, -12.0,  +32.0, -4.0, -18.0,  +32.0, +2.0, -18.0,
+  //Front
+  +32.0, -4.0, -12.0,  +32.0, +2.0, -12.0,  +26.0, -4.0, -12.0,
+  +26.0, +2.0, -12.0,  +26.0, -4.0, -12.0,  +32.0, +2.0, -12.0,
+  //Back
+  +32.0, +2.0, -18.0,  +32.0, -4.0, -18.0,  +26.0, -4.0, -18.0,
+  +32.0, +2.0, -18.0,  +26.0, -4.0, -18.0,   +26.0, +2.0, -18.0,
+  //Bottom
+  +26.0, -4.0, -12.0,  +26.0, -4.0, -18.0,  +32.0, -4.0, -12.0,
+  +32.0, -4.0, -12.0,  +26.0, -4.0, -18.0,  +32.0, -4.0, -18.0,
+
+  //RINGS OF SATURN
+   //LEFT
+   +22.0, -1.0, -22.0,  +22.0, -1.0, -8.0,  +29.0, -1.0, -8.0, 
+    +22.0, -1.0, -22.0,  +29.0, -1.0, -8.0,  +29.0, -1.0, -22.0,
+   //Top
+   +29.0, -1.0, -22.0,  +29.0, -1.0, -8.0,  +36.0, -1.0, -8.0, 
+    +29.0, -1.0, -22.0,  +36.0, -1.0, -8.0,  +36.0, -1.0, -22.0,
+
+     //COSMOS
+  //Top
+  -50.0, +50.0, -50.0,  -50.0, +50.0, +50.0,  +50.0, +50.0, +50.0, //3 punkty po 3 składowe - X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3 - 1 trójkąt
+    -50.0, +50.0, -50.0,  +50.0, +50.0, +50.0,  +50.0, +50.0, -50.0,
+  //Left
+    -50.0, -50.0, +50.0,  -50.0, +50.0, +50.0,  -50.0, -50.0, -50.0,
+    -50.0, -50.0, -50.0,  -50.0, +50.0, +50.0,  -50.0, +50.0, -50.0,
+  //Right
+    +50.0, +50.0, +50.0,  +50.0, -50.0, +50.0,  +50.0, -50.0, -50.0,
+    +50.0, +50.0, +50.0,  +50.0, -50.0, -50.0,  +50.0, +50.0, -50.0,
+  //Front
+    +50.0, -50.0, +50.0,  +50.0, +50.0, +50.0,  -50.0, -50.0, +50.0,
+    -50.0, +50.0, +50.0,  -50.0, -50.0, +50.0,  +50.0, +50.0, +50.0,
+  //Back
+    +50.0, +50.0, -50.0,  +50.0, -50.0, -50.0,  -50.0, -50.0, -50.0,
+    +50.0, +50.0, -50.0,  -50.0, -50.0, -50.0,  -50.0, +50.0, -50.0,
+  //Bottom
+    -50.0, -50.0, +50.0,  -50.0, -50.0, -50.0,  +50.0, -50.0, +50.0,
+    +50.0, -50.0, +50.0,  -50.0, -50.0, -50.0,  +50.0, -50.0, -50.0,
+  ]
+
+  
+  vertexPositionBuffer = gl.createBuffer(); //Stworzenie tablicy w pamieci karty graficznej
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexPosition), gl.STATIC_DRAW);
+  vertexPositionBuffer.itemSize = 3; //zdefiniowanie liczby współrzednych per wierzchołek
+  vertexPositionBuffer.numItems = 112; //Zdefinoiowanie liczby punktów w naszym buforze
+  
+  //Opis sceny 3D, kolor każdego z wierzchołków
+  let vertexColor = [
+  //SUN
+  
+  //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 składowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójkąt
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+
+    //MERCURY
+    //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 składowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójkąt
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+
+  //VENUS
+    //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 składowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójkąt
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+
+//EARTH
+    //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 składowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójkąt
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+
+    //MOON
+    //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 składowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójkąt
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+
+    //MARS
+    //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 składowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójkąt
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+
+    //JUPITER
+    //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 składowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójkąt
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+
+     //SATURN
+    //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 składowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójkąt
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+
+  //SATURN RINGS
+  //Top
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+
+    //Cosmos
+    //Top
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0, //3 punkty po 3 składowe - R1,G1,B1, R2,G2,B2, R3,G3,B3 - 1 trójkąt
+    1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+  //Left
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+    0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+  //Right
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+    0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+  //Front
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+  //Back
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+    1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+  //Bottom
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+    0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+
+  ]
+
+  
+  vertexColorBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexColor), gl.STATIC_DRAW);
+  vertexColorBuffer.itemSize = 3;
+  vertexColorBuffer.numItems = 112;
+
+  let vertexCoords = [
+  //SUN
+
+  //Top
+    0.0, 0.5,  0.4, 0.5,  0.4, 1.0, //3 punkty po 2 składowe - U1,V1, U2,V2, U3,V3 - 1 trójkąt
+    0.0, 0.5,  0.4, 1.0,  0.0, 1.0,
+  //Left
+    0.4, 0.5,  0.4, 1.0,  0.0, 0.5, 
+    0.0, 0.5,  0.4, 1.0,  0.0, 1.0,
+  //Right
+    0.0, 0.5,  0.4, 0.5,  0.4, 1.0, 
+    0.0, 0.5,  0.4, 1.0,  0.0, 1.0,
+  //Front
+    0.4, 0.5,  0.4, 1.0,  0.0, 0.5, 
+    0.0, 1.0,  0.0, 0.5,  0.4, 1.0,
+  //Back
+    0.0, 0.5,  0.4, 0.5,  0.4, 1.0, 
+    0.0, 0.5,  0.4, 1.0,  0.0, 1.0,
+  //Bottom
+    0.0, 0.5,  0.0, 1.0,  0.4, 0.5, 
+    0.4, 0.5,  0.0, 1.0,  0.4, 1.0,
+
+  //MERCURY
+  //Top
+    0.4, 0.5,  0.6, 0.5,  0.6, 0.75, //3 punkty po 2 składowe - U1,V1, U2,V2, U3,V3 - 1 trójkąt
+    0.4, 0.5,  0.6, 0.75,  0.4, 0.75,
+  //Left
+    0.6, 0.5,  0.6, 0.75,  0.4, 0.5, 
+    0.4, 0.5,  0.6, 0.75,  0.4, 0.75,
+  //Right
+    0.4, 0.5,  0.6, 0.5,  0.6, 0.75, 
+    0.4, 0.5,  0.6, 0.75,  0.4, 0.75,
+  //Front
+    0.6, 0.5,  0.6, 0.75,  0.4, 0.5, 
+    0.4, 0.75,  0.4, 0.5,  0.6, 0.75,
+  //Back
+    0.4, 0.5,  0.6, 0.5,  0.6, 0.75, 
+    0.4, 0.5,  0.6, 0.75,  0.4, 0.75,
+  //Bottom
+    0.4, 0.5,  0.4, 0.75,  0.6, 0.5, 
+    0.6, 0.5,  0.4, 0.75,  0.6, 0.75,
+
+  //VENUS
+  //Top
+    0.4, 0.75,  0.6, 0.75,  0.6, 1.0, //3 punkty po 2 składowe - U1,V1, U2,V2, U3,V3 - 1 trójkąt
+    0.4, 0.75,  0.6, 1.0,  0.4, 1.0,
+  //Left
+    0.6, 0.75,  0.6, 1.0,  0.4, 0.75, 
+    0.4, 0.75,  0.6, 1.0,  0.4, 1.0,
+  //Right
+    0.4, 0.75,  0.6, 0.75,  0.6, 1.0, 
+    0.4, 0.75,  0.6, 1.0,  0.4, 1.0,
+  //Front
+    0.6, 0.75,  0.6, 1.0,  0.4, 0.75, 
+    0.4, 1.0,  0.4, 0.75,  0.6, 1.0,
+  //Back
+    0.4, 0.75,  0.6, 0.75,  0.6, 1.0, 
+    0.4, 0.75,  0.6, 1.0,  0.4, 1.0,
+  //Bottom
+    0.4, 0.75,  0.4, 1.0,  0.6, 0.75, 
+    0.6, 0.75,  0.4, 1.0,  0.6, 1.0,
+
+    //EARTH
+  //Top
+    0.6, 0.875,  0.7, 0.875,  0.7, 1.0, //3 punkty po 2 składowe - U1,V1, U2,V2, U3,V3 - 1 trójkąt
+    0.6, 0.875,  0.7, 1.0,  0.6, 1.0,
+  //Left
+    0.8, 0.875,   0.8, 1.0,   0.7, 0.875,  
+    0.7, 0.875,   0.8, 1.0, 0.7, 1.0,        
+  //Right
+   0.8, 0.875, 0.8, 0.75,   0.9, 0.75,   
+    0.8, 0.875,    0.9, 0.75, 0.9, 0.875,
+  //Front
+    0.9, 0.875,  0.9, 1.0, 0.8, 0.875, 
+    0.8, 1.0,    0.8, 0.875, 0.9, 1.0, 
+  //Back
+    0.6, 0.875,  0.6, 0.75,  0.7, 0.75,  
+    0.6, 0.875, 0.7, 0.75, 0.7, 0.875,
+  //Bottom
+
+    0.8, 0.875, 0.7, 0.875, 0.8, 0.75,
+    0.8, 0.75,  0.7, 0.875, 0.7, 0.75,
+
+    //MOON
+  //Top
+    0.9, 0.875,  1.0, 0.875,  1.0, 1.0, //3 punkty po 2 składowe - U1,V1, U2,V2, U3,V3 - 1 trójkąt
+    0.9, 0.875,  1.0, 1.0,  0.9, 1.0,
+  //Left
+    1.0, 0.875,  1.0, 1.0,  0.9, 0.875, 
+    0.9, 0.875,  1.0, 1.0,  0.9, 1.0,
+  //Right
+    0.9, 0.875,  1.0, 0.875,  1.0, 1.0, 
+    0.9, 0.875,  1.0, 1.0,  0.9, 1.0,
+  //Front
+    1.0, 0.875,  1.0, 1.0,  0.9, 0.875, 
+    0.9, 1.0,  0.9, 0.875,  1.0, 1.0,
+  //Back
+    0.9, 0.875,  1.0, 0.875,  1.0, 1.0, 
+    0.9, 0.875,  1.0, 1.0,  0.9, 1.0,
+  //Bottom
+    0.9, 0.875,  0.9, 1.0,  1.0, 0.875, 
+    1.0, 0.875,  0.9, 1.0,  1.0, 1.0,
+    
+  //MARS
+  //Top
+  0.6, 0.5,  0.8, 0.5,  0.8, 0.75, //3 punkty po 2 składowe - U1,V1, U2,V2, U3,V3 - 1 trójkąt
+    0.6, 0.5,  0.8, 0.75,  0.6, 0.75,
+  //Left
+    0.8, 0.5,  0.8, 0.75,  0.6, 0.5, 
+    0.6, 0.5,  0.8, 0.75,  0.6, 0.75,
+  //Right
+    0.6, 0.5,  0.8, 0.5,  0.8, 0.75, 
+    0.6, 0.5,  0.8, 0.75,  0.6, 0.75,
+  //Front
+    0.8, 0.5,  0.8, 0.75,  0.6, 0.5, 
+    0.6, 0.75,  0.6, 0.5,  0.8, 0.75,
+  //Back
+    0.6, 0.5,  0.8, 0.5,  0.8, 0.75, 
+    0.6, 0.5,  0.8, 0.75,  0.6, 0.75,
+  //Bottom
+    0.6, 0.5,  0.6, 0.75,  0.8, 0.5, 
+    0.8, 0.5,  0.6, 0.75,  0.8, 0.75,
+
+     //JUPITER
+  //Top
+  0.0, 0.0,  0.4, 0.0,  0.4, 0.5, //3 punkty po 2 składowe - U1,V1, U2,V2, U3,V3 - 1 trójkąt
+    0.0, 0.0,  0.4, 0.5,  0.0, 0.5,
+  //Left
+    0.4, 0.0,  0.4, 0.5,  0.0, 0.0, 
+    0.0, 0.0,  0.4, 0.5,  0.0, 0.5,
+  //Right
+    0.0, 0.0,  0.4, 0.0,  0.4, 0.5, 
+    0.0, 0.0,  0.4, 0.5,  0.0, 0.5,
+  //Front
+    0.4, 0.0,  0.4, 0.5,  0.0, 0.0, 
+    0.0, 0.5,  0.0, 0.0,  0.4, 0.5,
+  //Back
+    0.0, 0.0,  0.4, 0.0,  0.4, 0.5, 
+    0.0, 0.0,  0.4, 0.5,  0.0, 0.5,
+  //Bottom
+    0.0, 0.0,  0.0, 0.5,  0.4, 0.0, 
+    0.4, 0.0,  0.0, 0.5,  0.4, 0.5,
+
+    //SATURN
+  //Top
+    0.4, 0.15,  0.8, 0.15,  0.8, 0.5, //3 punkty po 2 składowe - U1,V1, U2,V2, U3,V3 - 1 trójkąt
+    0.4, 0.15,  0.8, 0.5,  0.4, 0.5,
+  //Left
+    0.8, 0.15,  0.8, 0.5,  0.4, 0.15, 
+    0.4, 0.15,  0.8, 0.5,  0.4, 0.5,
+  //Rightd
+    0.4, 0.15,  0.8, 0.15,  0.8, 0.5, 
+    0.4, 0.15,  0.8, 0.5,  0.4, 0.5,
+  //Front
+    0.8, 0.15,  0.8, 0.5,  0.4, 0.15, 
+    0.4, 0.5,  0.4, 0.15,  0.8, 0.5,
+  //Back
+    0.4, 0.15,  0.8, 0.15,  0.8, 0.5, 
+    0.4, 0.15,  0.8, 0.5,  0.4, 0.5,
+  //Bottom
+    0.4, 0.15,  0.4, 0.5,  0.8, 0.15, 
+    0.8, 0.15,  0.4, 0.5,  0.8, 0.5,
+
+  //SATURN RINGS
+    0.8, 0.1, 0.8, 0.0,   0.4, 0.0, 
+    0.8, 0.1,  0.4, 0.1,  0.4, 0.0,
+  //Front
+    0.8, 0.1, 0.8, 0.0,   0.4, 0.0, 
+    0.8, 0.1,  0.4, 0.1,  0.4, 0.0,
+
+  //COSMOS
+    0.8, 0.5,  1.0, 0.5,  1.0, 0.75, //3 punkty po 2 składowe - U1,V1, U2,V2, U3,V3 - 1 trójkąt
+    0.8, 0.5,  1.0, 0.75,  0.8, 0.75,
+  //Left
+    1.0, 0.5,  1.0, 0.75,  0.8, 0.5, 
+    0.8, 0.5,  1.0, 0.75,  0.8, 0.75,
+  //Right
+    0.8, 0.5,  1.0, 0.5,  1.0, 0.75, 
+    0.8, 0.5,  1.0, 0.75,  0.8, 0.75,
+  //Front
+    1.0, 0.5,  1.0, 0.75,  0.8, 0.5, 
+    0.8, 0.75,  0.8, 0.5,  1.0, 0.75,
+  //Back
+    0.8, 0.5,  1.0, 0.5,  1.0, 0.75, 
+    0.8, 0.5,  1.0, 0.75,  0.8, 0.75,
+  //Bottom
+    0.8, 0.5,  0.8, 0.75,  1.0, 0.5, 
+    1.0, 0.5,  0.8, 0.75,  1.0, 0.75,
+ 
+  ];
+  
+  vertexCoordsBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexCoordsBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexCoords), gl.STATIC_DRAW);
+  vertexCoordsBuffer.itemSize = 2;
+  vertexCoordsBuffer.numItems = 112;
+
+  textureBuffer = gl.createTexture();
+  var textureImg = new Image();
+  textureImg.onload = function() { //Wykonanie kodu automatycznie po załadowaniu obrazka
+    gl.bindTexture(gl.TEXTURE_2D, textureBuffer);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textureImg); //Faktyczne załadowanie danych obrazu do pamieci karty graficznej
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); //Ustawienie parametrów próbkowania tekstury
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  }
+  textureImg.src="galactic.png"; //Nazwa obrazka
+  
+  //Macierze opisujące położenie wirtualnej kamery w przestrzenie 3D
+  let aspect = gl.viewportWidth/gl.viewportHeight;
+  let fov = 45.0 * Math.PI / 180.0; //Określenie pola widzenia kamery
+  let zFar = 100.0; //Ustalenie zakresów renderowania sceny 3D (od obiektu najbliższego zNear do najdalszego zFar)
+  let zNear = 0.1;
+  uPMatrix = [
+   1.0/(aspect*Math.tan(fov/2)),0                           ,0                         ,0                            ,
+   0                         ,1.0/(Math.tan(fov/2))         ,0                         ,0                            ,
+   0                         ,0                           ,-(zFar+zNear)/(zFar-zNear)  , -1,
+   0                         ,0                           ,-(2*zFar*zNear)/(zFar-zNear) ,0.0,
+  ];
+
+  uMVMatrix = [
+  1,0,0,0, //Macierz jednostkowa
+  0,1,0,0,
+  0,0,1,0,
+  0,0,0,1
+  ];
+  
+  let uMVRotZ = [
+  +Math.cos(angleZ*Math.PI/180.0),+Math.sin(angleZ*Math.PI/180.0),0,0,
+  -Math.sin(angleZ*Math.PI/180.0),+Math.cos(angleZ*Math.PI/180.0),0,0,
+  0,0,1,0,
+  0,0,0,1
+  ];
+  
+  let uMVRotY = [
+  +Math.cos(angleY*Math.PI/180.0),0,-Math.sin(angleY*Math.PI/180.0),0,
+  0,1,0,0,
+  +Math.sin(angleY*Math.PI/180.0),0,+Math.cos(angleY*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+  
+  let uMVRotX = [
+  1,0,0,0,
+  0,+Math.cos(angleX*Math.PI/180.0),+Math.sin(angleX*Math.PI/180.0),0,
+  0,-Math.sin(angleX*Math.PI/180.0),+Math.cos(angleX*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+  
+  let uMVTranslateZ = [
+  1,0,0,0,
+  0,1,0,0,
+  0,0,1,0,
+  0,0,tz,1
+  ];
+
+  uMVMatrix = MatrixMul(uMVMatrix,uMVRotX);
+  uMVMatrix = MatrixMul(uMVMatrix,uMVRotY);
+  uMVMatrix = MatrixMul(uMVMatrix,uMVRotZ);
+  uMVMatrix = MatrixMul(uMVMatrix,uMVTranslateZ);
+  Tick();
+  
+} 
+//let angle = 45.0; //Macierz transformacji świata - określenie położenia kamery
+
+var angleZ = 0.0;
+var angleY = 0.0;
+var angleX = 0.0;
+var angleXDeg = 1.0;
+var angleYDeg = 1.0;
+var angleZDeg = 1.0;
+var tz = 0.0;
+var tx = 0.0;
+var speed = 2.0;
+
+function Tick()
+{  
+  
+  //Render Scene
+  gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight); 
+  gl.clearColor(1.0,1.0,1.0,1.0); //Wyczyszczenie obrazu kolorem czerwonym
+  gl.clearDepth(1.0);             //Wyczyścienie bufora głebi najdalszym planem
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(shaderProgram)   //Użycie przygotowanego programu shaderowego
+  
+  gl.enable(gl.DEPTH_TEST);           // Włączenie testu głębi - obiekty bliższe mają przykrywać obiekty dalsze
+  gl.depthFunc(gl.LEQUAL);            // 
+  
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uPMatrix"), false, new Float32Array(uPMatrix)); //Wgranie macierzy kamery do pamięci karty graficznej
+  gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMVMatrix"), false, new Float32Array(uMVMatrix));
+  
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexPosition"));  //Przekazanie położenia
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexPosition"), vertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexColor"));  //Przekazanie kolorów
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexColor"), vertexColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  
+  gl.enableVertexAttribArray(gl.getAttribLocation(shaderProgram, "aVertexCoords"));  //Pass the geometry
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexCoordsBuffer);
+  gl.vertexAttribPointer(gl.getAttribLocation(shaderProgram, "aVertexCoords"), vertexCoordsBuffer.itemSize, gl.FLOAT, false, 0, 0);
+  
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, textureBuffer);
+  gl.uniform1i(gl.getUniformLocation(shaderProgram, "uSampler"), 0);
+
+  gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
+   
+  setTimeout(Tick,100);
+}
+function handlekeydown(e)
+{
+ if(e.keyCode==87) 
+ {
+   //angleX=angleX+1.0; //W
+   //tz=tz+1;
+   let OX = [
+    uMVMatrix[0],
+    uMVMatrix[4],
+    uMVMatrix[8],
+    ];
+
+    let OY = [
+    uMVMatrix[1],
+    uMVMatrix[5],
+    uMVMatrix[9],
+  ];
+
+    let OZ = [
+    uMVMatrix[2],
+    uMVMatrix[6],
+    uMVMatrix[10],
+  ];
+  let TranslationMatrixTX = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  speed*OX[0],speed*OX[1],speed*OX[2],1
+  ];
+  let TranslationMatrixTY = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  speed*OY[0],speed*OY[1],speed*OY[2],1
+  ];
+  let TranslationMatrixTZ = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  speed*OZ[0],speed*OZ[1],speed*OZ[2],1
+  ];
+  uMVMatrix = MatrixMul(TranslationMatrixTZ,uMVMatrix);
+ }
+ if(e.keyCode==83)  //S
+ {
+    //angleX=angleX+1.0;
+   //tz=tz+1;
+   let OX = [
+    uMVMatrix[0],
+    uMVMatrix[4],
+    uMVMatrix[8],
+    ];
+
+    let OY = [
+    uMVMatrix[1],
+    uMVMatrix[5],
+    uMVMatrix[9],
+  ];
+
+    let OZ = [
+    uMVMatrix[2],
+    uMVMatrix[6],
+    uMVMatrix[10],
+  ];
+  let TranslationMatrixTX = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  -speed*OX[0],-speed*OX[1],-speed*OX[2],1
+  ];
+  let TranslationMatrixTY = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  -speed*OY[0],-speed*OY[1],-speed*OY[2],1
+  ];
+  let TranslationMatrixTZ = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  -speed*OZ[0],-speed*OZ[1],-speed*OZ[2],1
+  ];
+  uMVMatrix = MatrixMul(TranslationMatrixTZ,uMVMatrix);
+ }
+ if(e.keyCode==68)//D
+ { 
+ angleY=angleY+1.0;
+ let uMVRotY1Degree = [
+  +Math.cos(1*Math.PI/180.0),0,-Math.sin(1*Math.PI/180.0),0,
+  0,1,0,0,
+  +Math.sin(1*Math.PI/180.0),0,+Math.cos(1*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+
+  uMVMatrix = MatrixMul(uMVRotY1Degree, uMVMatrix);
+
+ }
+ if(e.keyCode==65)//A
+ { 
+
+  let uMVRotY1Degree = [
+  +Math.cos(-1*Math.PI/180.0),0,-Math.sin(-1*Math.PI/180.0),0,
+  0,1,0,0,
+  +Math.sin(-1*Math.PI/180.0),0,+Math.cos(-1*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+
+  uMVMatrix = MatrixMul(uMVRotY1Degree, uMVMatrix);
+ }
+ if(e.keyCode==81)//Q
+ { 
+   //angleX=angleX+1.0;
+   //tz=tz+1;
+   let OX = [
+    uMVMatrix[0],
+    uMVMatrix[4],
+    uMVMatrix[8],
+    ];
+
+    let OY = [
+    uMVMatrix[1],
+    uMVMatrix[5],
+    uMVMatrix[9],
+  ];
+
+    let OZ = [
+    uMVMatrix[2],
+    uMVMatrix[6],
+    uMVMatrix[10],
+  ];
+  let TranslationMatrixTX = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  speed*OX[0],speed*OX[1],speed*OX[2],1
+  ];
+  let TranslationMatrixTY = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  0,0,0,1
+  ];
+  let TranslationMatrixTZ = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  0,0,0,1
+  ];
+  uMVMatrix = MatrixMul(TranslationMatrixTX,uMVMatrix);
+ }
+ if(e.keyCode==69)//E
+ {
+     //angleX=angleX+1.0;
+   //tz=tz+1;
+   let OX = [
+    uMVMatrix[0],
+    uMVMatrix[4],
+    uMVMatrix[8],
+    ];
+
+    let OY = [
+    uMVMatrix[1],
+    uMVMatrix[5],
+    uMVMatrix[9],
+  ];
+
+    let OZ = [
+    uMVMatrix[2],
+    uMVMatrix[6],
+    uMVMatrix[10],
+  ];
+  let TranslationMatrixTX = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  -speed*OX[0],-speed*OX[1],-speed*OX[2],1
+  ];
+  let TranslationMatrixTY = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  0,0,0,1
+  ];
+  let TranslationMatrixTZ = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  0,0,0,1
+  ];
+  uMVMatrix = MatrixMul(TranslationMatrixTX,uMVMatrix);
+ }
+ if(e.keyCode==90)//Z
+ {
+     //angleX=angleX+1.0;
+   //tz=tz+1;
+   let OX = [
+    uMVMatrix[0],
+    uMVMatrix[4],
+    uMVMatrix[8],
+    ];
+
+    let OY = [
+    uMVMatrix[1],
+    uMVMatrix[5],
+    uMVMatrix[9],
+  ];
+
+    let OZ = [
+    uMVMatrix[2],
+    uMVMatrix[6],
+    uMVMatrix[10],
+  ];
+  let TranslationMatrixTX = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  0,0,0,1
+  ];
+  let TranslationMatrixTY = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  0.1*OY[0],0.1*OY[1],0.1*OY[2],1
+  ];
+  let TranslationMatrixTZ = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  0,0,0,1
+  ];
+  uMVMatrix = MatrixMul(TranslationMatrixTY,uMVMatrix);
+ }
+ if(e.keyCode==88)//Z
+ {
+     //angleX=angleX+1.0;
+   //tz=tz+1;
+   let OX = [
+    uMVMatrix[0],
+    uMVMatrix[4],
+    uMVMatrix[8],
+    ];
+
+    let OY = [
+    uMVMatrix[1],
+    uMVMatrix[5],
+    uMVMatrix[9],
+  ];
+
+    let OZ = [
+    uMVMatrix[2],
+    uMVMatrix[6],
+    uMVMatrix[10],
+  ];
+  let TranslationMatrixTX = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  0,0,0,1
+  ];
+  let TranslationMatrixTY = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  -0.1*OY[0],-0.1*OY[1],-0.1*OY[2],1
+  ];
+  let TranslationMatrixTZ = 
+  [
+  1,0,0,0, 
+  0,1,0,0, 
+  0,0,1,0, 
+  0,0,0,1
+  ];
+  uMVMatrix = MatrixMul(TranslationMatrixTY,uMVMatrix);
+ }
+ if(e.keyCode==67)//C
+ { 
+
+  let uMVRotX1Degree = [
+  1,0,0,0,
+  0,+Math.cos(-angleXDeg*Math.PI/180.0),+Math.sin(-angleXDeg*Math.PI/180.0),0,
+  0,-Math.sin(-angleXDeg*Math.PI/180.0),+Math.cos(-angleXDeg*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+
+  uMVMatrix = MatrixMul(uMVRotX1Degree, uMVMatrix);
+ }
+ if(e.keyCode==86)//V
+ { 
+
+  let uMVRotX1Degree = [
+  1,0,0,0,
+  0,+Math.cos(angleXDeg*Math.PI/180.0),+Math.sin(angleXDeg*Math.PI/180.0),0,
+  0,-Math.sin(angleXDeg*Math.PI/180.0),+Math.cos(angleXDeg*Math.PI/180.0),0,
+  0,0,0,1
+  ];
+
+  uMVMatrix = MatrixMul(uMVRotX1Degree, uMVMatrix);
+ }
+ //alert(e.keyCode);
+ //alert(angleX);
+}
+</script>
+</head>
+<body onload="startGL()" onkeydown="handlekeydown(event)">
+<canvas id="canvas3D" width="640" height="480" style="border: solid black 1px"></canvas>
+</body>
+<br>STEROWANIE: WSQE, AD -RotateLeft/Right, ZX - height, CV RotateUp/Down
+<img id="textureImg" src="galactic.png">
+</html>

@@ -896,7 +896,7 @@ function Tick()
   //gl.drawArrays(gl.TRIANGLES, 0, vertexPositionBuffer.numItems*vertexPositionBuffer.itemSize); //Faktyczne wywołanie rendrowania
   gl.drawElements(gl.TRIANGLES, indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
   
-  setTimeout(Tick,100);
+  setTimeout(Tick,10);
 }
 function handlekeydown(e)
 {
